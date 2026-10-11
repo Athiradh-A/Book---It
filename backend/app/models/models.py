@@ -185,6 +185,35 @@ class AllocationRun(Base):
     status = Column(String) # SUCCESS, FAILED
     logs = Column(Text)
 
+class Amenity(Base):
+    __tablename__ = "amenities"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False)
+    category = Column(String, nullable=False, index=True)
+    description = Column(Text)
+    resource_kind = Column(String, nullable=False, default="EQUIPMENT") # SPACE or EQUIPMENT
+    quantity = Column(Integer, nullable=False, default=1)
+    capacity = Column(Integer)
+    location = Column(String)
+    requires_approval = Column(Boolean, nullable=False, default=True)
+    status = Column(String, nullable=False, default="AVAILABLE")
+
+class AmenityBooking(Base):
+    __tablename__ = "amenity_bookings"
+    id = Column(Integer, primary_key=True, index=True)
+    amenity_id = Column(Integer, ForeignKey("amenities.id"), nullable=False, index=True)
+    requester_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    start_time = Column(DateTime, nullable=False, index=True)
+    end_time = Column(DateTime, nullable=False, index=True)
+    quantity = Column(Integer, nullable=False, default=1)
+    purpose = Column(Text, nullable=False)
+    status = Column(String, nullable=False, default="PENDING_FACULTY_APPROVAL")
+    decision_comment = Column(Text)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    decided_at = Column(DateTime(timezone=True))
+
+    amenity = relationship("Amenity")
+
 # Add back-relationship for Building
 Building.rooms = relationship("Room", back_populates="building")
 

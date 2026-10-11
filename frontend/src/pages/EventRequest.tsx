@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from "react"
-import axios from "axios"
-
-const api = axios.create({ baseURL: "http://localhost:8000/api" })
+import { api } from "../lib/api"
 
 function EventRequest() {
     const [form, setForm] = useState({

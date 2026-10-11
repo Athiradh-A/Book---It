@@ -1,8 +1,6 @@
 import React, { useState } from "react"
-import axios from "axios"
+import { api } from "../lib/api"
 import { useNavigate } from "react-router-dom"
-
-const api = axios.create({ baseURL: "http://localhost:8000/api" })
 
 function RoomSearch() {
     const navigate = useNavigate()

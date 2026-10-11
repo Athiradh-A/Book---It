@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from "react"
 import { useSearchParams, useNavigate } from "react-router-dom"
-import axios from "axios"
-
-const api = axios.create({ baseURL: "http://localhost:8000/api" })
+import { api } from "../lib/api"
 
 function SlotBooking() {
     const [searchParams] = useSearchParams()

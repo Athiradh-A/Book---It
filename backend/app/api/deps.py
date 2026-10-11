@@ -8,13 +8,25 @@ from jose.exceptions import JWTError
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
-def get_current_user(db: Session = Depends(get_db)):
-    # BYPASS LOGIN: Return a mock student user
-    return User(id=1, username="mock_student", email="student@college.edu", full_name="Mock Student")
+def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+    credentials_error = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = decode_token(token)
+        if payload.get("type") != "access" or not payload.get("sub"):
+            raise credentials_error
+    except JWTError:
+        raise credentials_error
+    user = db.query(User).filter(User.username == payload["sub"], User.is_active.is_(True)).first()
+    if not user:
+        raise credentials_error
+    return user
 
-def get_current_user_roles(user: User = Depends(get_current_user)):
-    # BYPASS LOGIN: Return student role
-    return ["STUDENT"]
+def get_current_user_roles(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    return [name for (name,) in db.query(Role.name).join(UserRole, UserRole.role_id == Role.id).filter(UserRole.user_id == user.id).all()]
 
 def require_role(allowed_roles: list):
     def role_checker(user: User = Depends(get_current_user), roles = Depends(get_current_user_roles)):

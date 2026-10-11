@@ -6,7 +6,7 @@ from app.db.session import get_db
 from app.schemas.bookings import AvailabilityRequest, AvailabilityResponse, HoldRequest, HoldResponse, ConfirmRequest
 from app.services.availability_service import AvailabilityService
 from app.models.models import BookingHold, Booking, BookingStatus, Room, Timetable
-# Removed User import from here to prevent circular dependency crashes during startup
+from app.api.deps import get_current_user
 
 router = APIRouter(prefix="/bookings", tags=["Bookings"])
 
@@ -131,30 +131,31 @@ def get_room_availability(
 @router.post("/classroom/hold", response_model=HoldResponse)
 def hold_classroom(
     request: HoldRequest, 
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    user = Depends(get_current_user),
 ):
-    # Fetch the admin user directly inside the function
-    from app.models.models import User
-    user = db.query(User).filter(User.id == 1).first()
-    if not user:
-        # Self-healing: Create admin user if missing
-        user = User(
-            username="admin",
-            email="admin@college.edu",
-            hashed_password="hashed_password",
-            full_name="System Admin",
-            is_active=True
-        )
-        db.add(user)
-        db.commit()
-        db.refresh(user)
-
     try:
         start_dt = datetime.fromisoformat(request.start_time)
         end_dt = datetime.fromisoformat(request.end_time)
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid datetime format. Use ISO format (YYYY-MM-DDTHH:MM:SS)")
 
+    if end_dt <= start_dt or start_dt < datetime.now():
+        raise HTTPException(status_code=422, detail="Choose a future period with an end after the start")
+    room = db.query(Room).filter(Room.id == request.room_id, Room.is_active.is_(True)).with_for_update().first()
+    if not room:
+        raise HTTPException(status_code=404, detail="Room not found")
+    overlap_booking = db.query(Booking.id).filter(
+        Booking.room_id == request.room_id, Booking.status == BookingStatus.CONFIRMED,
+        Booking.start_time < end_dt, Booking.end_time > start_dt,
+    ).first()
+    overlap_hold = db.query(BookingHold.id).filter(
+        BookingHold.room_id == request.room_id, BookingHold.status == "ACTIVE",
+        BookingHold.expires_at > datetime.now(), BookingHold.start_time < end_dt,
+        BookingHold.end_time > start_dt,
+    ).first()
+    if overlap_booking or overlap_hold:
+        raise HTTPException(status_code=409, detail="Room was just reserved for this period")
     hold = BookingHold(
         room_id=request.room_id,
         user_id=user.id,
@@ -172,31 +173,31 @@ def hold_classroom(
 @router.post("/classroom/confirm")
 def confirm_classroom_booking(
     request: ConfirmRequest, 
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    user = Depends(get_current_user),
 ):
-    # Fetch the admin user directly inside the function
-    from app.models.models import User
-    user = db.query(User).filter(User.id == 1).first()
-    if not user:
-        # Self-healing: Create admin user if missing
-        user = User(
-            username="admin",
-            email="admin@college.edu",
-            hashed_password="hashed_password",
-            full_name="System Admin",
-            is_active=True
-        )
-        db.add(user)
-        db.commit()
-        db.refresh(user)
-
-    from app.models.models import Room # Local import to avoid circularity
-    hold = db.query(BookingHold).filter(BookingHold.id == request.hold_id).first()
+    hold = db.query(BookingHold).filter(BookingHold.id == request.hold_id).with_for_update().first()
     if not hold:
         raise HTTPException(status_code=404, detail="Hold not found or expired")
     
-    if hold.expires_at < datetime.now():
+    if hold.user_id != user.id:
+        raise HTTPException(status_code=403, detail="This hold belongs to another user")
+    if hold.status == "CONVERTED":
+        booking = db.query(Booking).filter(
+            Booking.requester_id == user.id, Booking.room_id == hold.room_id,
+            Booking.start_time == hold.start_time, Booking.end_time == hold.end_time,
+        ).first()
+        return {"message": "Booking already confirmed", "booking_id": booking.id if booking else None}
+    if hold.status != "ACTIVE" or hold.expires_at < datetime.now():
+        hold.status = "EXPIRED"; db.commit()
         raise HTTPException(status_code=400, detail="Hold has expired")
+
+    conflict = db.query(Booking.id).filter(
+        Booking.room_id == hold.room_id, Booking.status == BookingStatus.CONFIRMED,
+        Booking.start_time < hold.end_time, Booking.end_time > hold.start_time,
+    ).first()
+    if conflict:
+        raise HTTPException(status_code=409, detail="Room is no longer available")
 
     room = db.query(Room).filter(Room.id == hold.room_id).first()
     room_type = room.room_type if room else "CLASSROOM"
@@ -218,4 +219,20 @@ def confirm_classroom_booking(
     db.commit()
     
     return {"message": "Booking confirmed successfully", "booking_id": booking.id}
+
+@router.get("/my")
+def my_bookings(db: Session = Depends(get_db), user=Depends(get_current_user)):
+    bookings = db.query(Booking).filter(Booking.requester_id == user.id).order_by(Booking.start_time.desc()).all()
+    return [{"id": b.id, "room_id": b.room_id, "booking_type": b.booking_type, "start_time": b.start_time,
+             "end_time": b.end_time, "status": b.status.value, "purpose": b.purpose} for b in bookings]
+
+@router.post("/{booking_id}/cancel")
+def cancel_booking(booking_id: int, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    booking = db.query(Booking).filter(Booking.id == booking_id, Booking.requester_id == user.id).with_for_update().first()
+    if not booking:
+        raise HTTPException(status_code=404, detail="Booking not found")
+    if booking.status != BookingStatus.CONFIRMED or booking.start_time <= datetime.now():
+        raise HTTPException(status_code=409, detail="This booking cannot be cancelled")
+    booking.status = BookingStatus.CANCELLED; db.commit()
+    return {"message": "Booking cancelled"}
 
