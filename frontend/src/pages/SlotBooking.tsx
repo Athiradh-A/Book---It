@@ -1,111 +1,47 @@
-import React, { useState, useEffect } from "react"
-import { useSearchParams, useNavigate } from "react-router-dom"
-import { api } from "../lib/api"
+import { useEffect, useMemo, useState } from 'react'
+import { ArrowLeft, ArrowRight, Check, Clock3, ShieldCheck } from 'lucide-react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { api, messageFrom } from '../lib/api'
 
-function SlotBooking() {
-    const [searchParams] = useSearchParams()
-    const navigate = useNavigate()
-    const roomId = searchParams.get("roomId")
-    const date = searchParams.get("date") || new Date().toISOString().split("T")[0]
+type Slot = { slot:number; start:string; end:string; status:string }
 
-    const [slots, setSlots] = useState([])
-    const [holdId, setHoldId] = useState(null)
-    const [loading, setLoading] = useState(true)
+export default function SlotBooking() {
+  const [query] = useSearchParams(), navigate = useNavigate()
+  const roomId = Number(query.get('roomId')), date = query.get('date') || ''
+  const attendees = Number(query.get('capacity') || 1)
+  const [slots,setSlots]=useState<Slot[]>([]), [selected,setSelected]=useState<number[]>([])
+  const [hold,setHold]=useState<{id:number;expiresAt:number}|null>(null), [seconds,setSeconds]=useState(0)
+  const [purpose,setPurpose]=useState('Study / meeting'), [notice,setNotice]=useState(''), [loading,setLoading]=useState(true)
 
-    useEffect(() => {
-        fetchSlots()
-    }, [roomId, date])
+  const load=async()=>{setLoading(true);try{const {data}=await api.get(`/bookings/slots/${roomId}`,{params:{date}});setSlots(data.slots)}catch(e){setNotice(messageFrom(e))}finally{setLoading(false)}}
+  useEffect(()=>{if(roomId&&date)load()},[roomId,date])
+  useEffect(()=>{if(!hold)return;const tick=()=>{const left=Math.max(0,Math.ceil((hold.expiresAt-Date.now())/1000));setSeconds(left);if(!left){setHold(null);setSelected([]);setNotice('Your hold expired. The slots are available to others again.');load()}};tick();const id=window.setInterval(tick,1000);return()=>window.clearInterval(id)},[hold])
 
-    const fetchSlots = async () => {
-        setLoading(true)
-        try {
-            const res = await api.get(`/bookings/slots/${roomId}?date=${date}`)
-            setSlots(res.data.slots)
-        } catch (err) {
-            alert("Error fetching slots")
-        } finally {
-            setLoading(false)
-        }
-    }
+  const selectedSlots=useMemo(()=>slots.filter(s=>selected.includes(s.slot)).sort((a,b)=>a.slot-b.slot),[slots,selected])
+  const toggle=(slot:Slot)=>{
+    if(hold||slot.status!=='AVAILABLE')return
+    if(selected.includes(slot.slot)){setSelected(selected.filter(n=>n!==slot.slot));return}
+    const next=[...selected,slot.slot].sort((a,b)=>a-b)
+    if(next.some((n,i)=>i>0&&n!==next[i-1]+1)){setNotice('Choose consecutive slots only.');return}
+    setNotice('');setSelected(next)
+  }
+  const createHold=async()=>{
+    if(!selectedSlots.length)return
+    try{const {data}=await api.post('/bookings/classroom/hold',{room_id:roomId,start_time:`${date}T${selectedSlots[0].start}:00`,end_time:`${date}T${selectedSlots.at(-1)!.end}:00`,expected_attendees:attendees});setHold({id:data.hold_id,expiresAt:new Date(data.expires_at).getTime()});setNotice('Space secured. Confirm before the timer reaches zero.')}catch(e){setNotice(messageFrom(e));load()}
+  }
+  const confirm=async()=>{if(!hold)return;try{await api.post('/bookings/classroom/confirm',{hold_id:hold.id,purpose,expected_attendees:attendees});setNotice('Booking confirmed — the room is yours.');setHold(null);setSelected([]);load()}catch(e){setNotice(messageFrom(e))}}
+  const clock=`${String(Math.floor(seconds/60)).padStart(2,'0')}:${String(seconds%60).padStart(2,'0')}`
+  if(!roomId||!date)return <div className="content-wrap"><div className="empty">Room or date is missing.</div></div>
 
-    const handleSlotClick = async (slot) => {
-        if (slot.status !== "AVAILABLE") {
-            alert(`This slot is ${slot.status.replace("_", " ").toLowerCase()}`)
-            return
-        }
-
-        try {
-            const start = `${date}T${slot.start}:00`
-            const end = `${date}T${slot.end}:00`
-            const res = await api.post("/bookings/classroom/hold", {
-                room_id: parseInt(roomId),
-                start_time: start,
-                end_time: end
-            })
-            setHoldId(res.data.hold_id)
-            alert("Slot held for 5 minutes!")
-        } catch (err) {
-            alert(err.response?.data?.detail || "Hold failed")
-        }
-    }
-
-    const handleConfirm = async () => {
-        try {
-            await api.post("/bookings/classroom/confirm", {
-                hold_id: holdId,
-                purpose: "Meeting/Study",
-                expected_attendees: 10
-            })
-            alert("Booking Confirmed!")
-            setHoldId(null)
-            fetchSlots()
-        } catch (err) {
-            alert(err.response?.data?.detail || "Confirmation failed")
-        }
-    }
-
-    if (!roomId) return <div className="p-6">Room ID missing in URL.</div>
-    if (loading) return <div className="p-6">Loading slots...</div>
-
-    return (
-        <div className="p-6 bg-gray-50 min-h-screen">
-            <button onClick={() => navigate(-1)} className="mb-4 text-[#D51F36] hover:underline">? Back to Search</button>
-            <h1 className="text-2xl font-bold mb-2">Select a Time Slot</h1>
-            <p className="mb-6 text-gray-600">Room ID: {roomId} | Date: {date}</p>
-
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-                <div className="flex items-center gap-2"><div className="w-4 h-4 bg-white border border-gray-300"></div><span>Available</span></div>
-                <div className="flex items-center gap-2"><div className="w-4 h-4 bg-gray-300"></div><span>Timetable Occupied</span></div>
-                <div className="flex items-center gap-2"><div className="w-4 h-4 bg-red-400"></div><span>User Booked</span></div>
-                <div className="flex items-center gap-2"><div className="w-4 h-4 bg-yellow-300"></div><span>Held by You</span></div>
-            </div>
-
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                {slots.map(slot => (
-                    <button 
-                        key={slot.slot} 
-                        onClick={() => handleSlotClick(slot)}
-                        className={`p-4 rounded-lg border transition-all ${
-                            slot.status === "AVAILABLE" ? "bg-white hover:bg-[#F3DADD] border-gray-200" : 
-                            slot.status === "TIMETABLE_OCCUPIED" ? "bg-gray-200 text-gray-500 cursor-not-allowed" : 
-                            slot.status === "HELD" ? "bg-yellow-200 border-yellow-400 font-bold" :
-                            "bg-red-100 text-red-600 cursor-not-allowed"
-                        }`}
-                    >
-                        <div className="font-bold">Slot {slot.slot}</div>
-                        <div className="text-sm">{slot.start} - {slot.end}</div>
-                        <div className="text-xs mt-2 uppercase">{slot.status.replace("_", " ")}</div>
-                    </button>
-                ))}
-            </div>
-
-            {holdId && (
-                <div className="fixed bottom-8 right-8 p-6 bg-yellow-100 border border-yellow-400 rounded-xl shadow-xl flex flex-col gap-3">
-                    <span className="font-bold text-yellow-800">Slot held! Confirm now to book.</span>
-                    <button onClick={handleConfirm} className="bg-green-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-green-700">Confirm Booking</button>
-                </div>
-            )}
-        </div>
-    )
+  return <div className="booking-experience">
+    <section className="booking-title"><button className="back-link" onClick={()=>navigate(-1)}><ArrowLeft/> Back to spaces</button><p className="kicker">STEP 02 — SELECT TIME</p><h1>Make time<br/><em>for the idea.</em></h1><div className="booking-context"><span>ROOM {roomId}</span><span>{new Date(date+'T12:00').toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric'})}</span><span>{attendees} PEOPLE</span></div></section>
+    <section className="slot-panel">
+      <div className="slot-panel-head"><div><p className="kicker">ELEVEN ACADEMIC SLOTS</p><h2>Choose one or more<br/>consecutive periods.</h2></div><div className="legend"><span><i className="available"/>Available</span><span><i className="occupied"/>Occupied</span><span><i className="chosen"/>Selected</span></div></div>
+      {notice&&<div className="booking-notice" role="status">{notice}</div>}
+      {loading?<div className="empty">Checking the timetable…</div>:<div className="slot-grid">{slots.map(s=><button key={s.slot} onClick={()=>toggle(s)} disabled={s.status!=='AVAILABLE'||!!hold} className={`slot-tile ${selected.includes(s.slot)?'selected':''} ${s.status!=='AVAILABLE'?'unavailable':''}`}><span>0{s.slot}</span><strong>{s.start}</strong><small>TO {s.end}</small><b>{selected.includes(s.slot)?'SELECTED':s.status.replaceAll('_',' ')}</b></button>)}</div>}
+      <div className="selection-bar"><div><span>YOUR SELECTION</span><strong>{selectedSlots.length?`${selectedSlots[0].start} — ${selectedSlots.at(-1)!.end}`:'Choose a starting slot'}</strong></div><button className="booking-action" disabled={!selected.length||!!hold} onClick={createHold}>Hold selected slots <ArrowRight/></button></div>
+    </section>
+    {hold&&<aside className="hold-drawer"><div className="timer-ring"><Clock3/><strong>{clock}</strong><span>REMAINING</span></div><div><p className="kicker">TEMPORARY HOLD ACTIVE</p><h2>Your space is waiting.</h2><p>No one else can claim these slots while the timer is active.</p><label>Purpose<input value={purpose} onChange={e=>setPurpose(e.target.value)} minLength={3}/></label><button className="confirm-action" onClick={confirm} disabled={seconds===0||purpose.trim().length<3}><ShieldCheck/> Confirm booking</button></div></aside>}
+    {!hold&&notice.startsWith('Booking confirmed')&&<div className="success-stamp"><Check/><span>CONFIRMED</span></div>}
+  </div>
 }
-export default SlotBooking

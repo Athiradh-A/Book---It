@@ -6,7 +6,18 @@ from datetime import datetime, time
 
 class AvailabilityService:
     @staticmethod
-    def check_room_availability(db: Session, room_id: int, req: AvailabilityRequest) -> ConflictInfo:
+    def expire_stale_holds(db: Session) -> int:
+        count = db.query(BookingHold).filter(
+            BookingHold.status == "ACTIVE",
+            BookingHold.expires_at <= datetime.utcnow()
+        ).update({BookingHold.status: "EXPIRED"}, synchronize_session=False)
+        if count:
+            db.flush()
+        return count
+
+    @staticmethod
+    def check_room_availability(db: Session, room_id: int, req: AvailabilityRequest, ignore_hold_id: Optional[int] = None) -> ConflictInfo:
+        AvailabilityService.expire_stale_holds(db)
         room = db.query(Room).filter(Room.id == room_id).first()
         if not room:
             return ConflictInfo(room_id=room_id, code="UNKNOWN", is_available=False, conflict_type="NOT_FOUND", details="Room does not exist")
@@ -50,13 +61,16 @@ class AvailabilityService:
         if overlapping_bookings:
             return ConflictInfo(room_id=room_id, code=room.code, is_available=False, conflict_type="BOOKING", details=f"Confirmed booking conflict: {overlapping_bookings.start_time} to {overlapping_bookings.end_time}")
 
-        overlapping_holds = db.query(BookingHold).filter(
+        hold_query = db.query(BookingHold).filter(
             BookingHold.room_id == room_id,
             BookingHold.status == "ACTIVE",
             BookingHold.expires_at > datetime.utcnow(),
             BookingHold.start_time < req.end_time,
             BookingHold.end_time > req.start_time
-        ).first()
+        )
+        if ignore_hold_id is not None:
+            hold_query = hold_query.filter(BookingHold.id != ignore_hold_id)
+        overlapping_holds = hold_query.first()
         if overlapping_holds:
             return ConflictInfo(room_id=room_id, code=room.code, is_available=False, conflict_type="HOLD", details="Room is temporarily held by another user")
 

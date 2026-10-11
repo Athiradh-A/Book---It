@@ -1,130 +1,33 @@
-import React, { useState } from "react"
-import { api } from "../lib/api"
-import { useNavigate } from "react-router-dom"
+import { useEffect, useState } from 'react'
+import { ArrowRight, Building2, CalendarDays, Search, Users } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { api, messageFrom } from '../lib/api'
 
-function RoomSearch() {
-    const navigate = useNavigate()
-    
-    // Helper function to get local date in YYYY-MM-DD format
-    const getLocalDate = () => {
-        const now = new Date();
-        const offset = now.getTimezoneOffset();
-        const localDate = new Date(now.getTime() - (offset * 60 * 1000));
-        return localDate.toISOString().split('T')[0];
-    };
+type Room={room_id:number;code:string;is_available:boolean}
+type Building={id:number;name:string;code:string}
+const localDate=()=>{const d=new Date();d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,10)}
 
-    const [params, setParams] = useState({ 
-        date: getLocalDate(), 
-        start: "09:00", 
-        end: "10:00", 
-        capacity: 10, 
-        roomType: "", 
-        academicBlock: "" 
-    })
-    const [rooms, setRooms] = useState([])
-    const [holdId, setHoldId] = useState(null)
-
-    const searchRooms = async () => {
-        try {
-            const res = await api.get("/bookings/availability", { 
-                params: { 
-                    date_str: params.date, 
-                    start_str: params.start, 
-                    end_str: params.end, 
-                    capacity: params.capacity,
-                    room_type: params.roomType || undefined,
-                    academic_block: params.academicBlock || undefined
-                } 
-            })
-            setRooms(res.data)
-        } catch (err) { alert("Error searching rooms") }
-    }
-
-    const handleHold = (roomId) => {
-        navigate(`/rooms/slots?roomId=${roomId}&date=${params.date}`)
-    }
-
-    const handleConfirm = async () => {
-        try {
-            await api.post("/bookings/classroom/confirm", {
-                hold_id: holdId,
-                purpose: "Study Session",
-                expected_attendees: parseInt(params.capacity)
-            })
-            alert("Booking Confirmed!")
-            setHoldId(null)
-            searchRooms()
-        } catch (err) { alert(err.response?.data?.detail || "Confirmation failed") }
-    }
-
-    return (
-        <div className="p-6 bg-gray-50 min-h-screen">
-            <h1 className="text-2xl font-bold mb-6">Find Available Rooms</h1>
-            <div className="bg-white p-4 rounded shadow-sm grid grid-cols-1 md:grid-cols-6 gap-4 mb-8">
-                <input 
-                    type="date" 
-                    className="p-2 border rounded" 
-                    value={params.date} 
-                    onChange={e => setParams({...params, date: e.target.value})} 
-                />
-                <input 
-                    type="time" 
-                    className="p-2 border rounded" 
-                    value={params.start} 
-                    onChange={e => {
-                        setParams({...params, start: e.target.value});
-                        e.target.blur(); // Closes the native time picker menu immediately
-                    }} 
-                />
-                <input 
-                    type="time" 
-                    className="p-2 border rounded" 
-                    value={params.end} 
-                    onChange={e => {
-                        setParams({...params, end: e.target.value});
-                        e.target.blur(); // Closes the native time picker menu immediately
-                    }} 
-                />
-                <input 
-                    type="number" 
-                    className="p-2 border rounded" 
-                    placeholder="Capacity" 
-                    value={params.capacity} 
-                    onChange={e => setParams({...params, capacity: e.target.value})} 
-                />
-                <select 
-                    className="p-2 border rounded" 
-                    value={params.academicBlock} 
-                    onChange={e => setParams({...params, academicBlock: e.target.value})}
-                >
-                    <option value="">All Blocks</option>
-                    <option value="AB-1">AB-1</option>
-                    <option value="AB-2">AB-2</option>
-                    <option value="AB-3">AB-3</option>
-                    <option value="AB-4">AB-4</option>
-                </select>
-                <button onClick={searchRooms} className="bg-[#D51F36] text-white px-4 py-2 rounded hover:bg-[#A91224]">Search</button>
-            </div>
-            {holdId && (
-                <div className="mb-6 p-4 bg-yellow-100 border border-yellow-400 rounded flex justify-between items-center">
-                    <span>Room is currently held. Confirm your booking now!</span>
-                    <button onClick={handleConfirm} className="bg-green-600 text-white px-4 py-2 rounded">Confirm Now</button>
-                </div>
-            )}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {rooms.filter(room => room.is_available).map(room => (
-                    <div key={room.room_id} className="p-4 rounded border shadow-sm bg-green-50 border-green-200">
-                        <div className="flex justify-between items-center mb-2">
-                            <span className="font-bold">Room {room.code}</span>
-                            <span className="text-xs px-2 py-1 rounded bg-green-200 text-green-800">
-                                Available
-                            </span>
-                        </div>
-                        <button onClick={() => handleHold(room.room_id)} className="mt-3 w-full bg-[#D51F36] text-white py-1 rounded text-sm">Hold Room</button>
-                    </div>
-                ))}
-            </div>
-        </div>
-    )
+export default function RoomSearch(){
+  const navigate=useNavigate(),[rooms,setRooms]=useState<Room[]>([]),[buildings,setBuildings]=useState<Building[]>([])
+  const [params,setParams]=useState({date:localDate(),start:'09:00',end:'10:00',capacity:10,roomType:'CLASSROOM',academicBlock:'',buildingId:''})
+  const [loading,setLoading]=useState(false),[notice,setNotice]=useState('Start with what you need. We’ll check the timetable, holds and maintenance.')
+  useEffect(()=>{api.get('/resources/buildings').then(r=>setBuildings(r.data)).catch(()=>{})},[])
+  const search=async(e?:React.FormEvent)=>{e?.preventDefault();if(params.end<=params.start){setNotice('End time must be after start time.');return}setLoading(true);try{const {data}=await api.get('/bookings/availability',{params:{date_str:params.date,start_str:params.start,end_str:params.end,capacity:params.capacity,room_type:params.roomType||undefined,academic_block:params.academicBlock||undefined,building_id:params.buildingId||undefined}});setRooms(data);setNotice(data.length?`${data.length} spaces match this moment.`:'No rooms match. Try another time, block or capacity.')}catch(err){setNotice(messageFrom(err))}finally{setLoading(false)}}
+  const choose=(id:number)=>navigate(`/rooms/slots?roomId=${id}&date=${params.date}&capacity=${params.capacity}`)
+  return <div className="room-finder">
+    <section className="finder-hero"><div><p className="kicker">01 — FIND YOUR SPACE</p><h1>Room for<br/><em>what’s next.</em></h1></div><p>Tell us when, where and how many. Book-It checks every academic class, confirmed booking, live hold and maintenance window before showing a room.</p><div className="finder-orbit"><Building2/><span>LIVE<br/>CAMPUS</span></div></section>
+    <section className="finder-workspace">
+      <form className="finder-form" onSubmit={search}>
+        <div className="field-number">01</div><label>Date<div><CalendarDays/><input type="date" min={localDate()} value={params.date} onChange={e=>setParams({...params,date:e.target.value})}/></div></label>
+        <div className="field-number">02</div><label>Time window<div className="time-pair"><input type="time" value={params.start} onChange={e=>setParams({...params,start:e.target.value})}/><span>—</span><input type="time" value={params.end} onChange={e=>setParams({...params,end:e.target.value})}/></div></label>
+        <div className="field-number">03</div><label>People<div><Users/><input type="number" min="1" value={params.capacity} onChange={e=>setParams({...params,capacity:Number(e.target.value)})}/></div></label>
+        <div className="field-number">04</div><label>Building<select value={params.buildingId} onChange={e=>setParams({...params,buildingId:e.target.value})}><option value="">Every building</option>{buildings.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}</select></label>
+        <div className="field-number">05</div><label>Academic block<select value={params.academicBlock} onChange={e=>setParams({...params,academicBlock:e.target.value})}><option value="">Every block</option>{['AB-1','AB-2','AB-3','AB-4'].map(x=><option key={x}>{x}</option>)}</select></label>
+        <button className="finder-submit" type="submit" disabled={loading}><Search/>{loading?'Checking campus…':'Find available rooms'}</button>
+      </form>
+      <div className="results-head"><p className="kicker">LIVE RESULTS</p><span>{notice}</span></div>
+      <div className="room-results">{rooms.map((room,i)=><button className="cinema-room-card" key={room.room_id} onClick={()=>choose(room.room_id)} style={{'--i':i} as React.CSSProperties}><span className="room-no">0{i+1}</span><div className="room-symbol"><Building2/></div><div><p>CLASSROOM · AVAILABLE</p><h2>{room.code}</h2></div><span className="room-arrow"><ArrowRight/></span></button>)}</div>
+      {!loading&&!rooms.length&&<div className="finder-empty"><span>SPACE</span><p>Set your requirements and search. Only genuinely available rooms will appear here.</p></div>}
+    </section>
+  </div>
 }
-export default RoomSearch

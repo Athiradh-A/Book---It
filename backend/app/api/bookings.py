@@ -16,6 +16,8 @@ def get_room_slots(
     date: str, 
     db: Session = Depends(get_db)
 ):
+    if AvailabilityService.expire_stale_holds(db):
+        db.commit()
     try:
         req_date = datetime.strptime(date, "%Y-%m-%d")
     except ValueError:
@@ -61,16 +63,22 @@ def get_room_slots(
     slots = []
     for slot_num in range(1, 12):
         start_time, end_time = slot_timings[slot_num]
+        slot_start = req_date.replace(hour=int(start_time[:2]), minute=int(start_time[3:]))
+        slot_end = req_date.replace(hour=int(end_time[:2]), minute=int(end_time[3:]))
         
         # Logic: A slot is occupied if it exists in official_classes, existing_bookings, or holds.
-        is_official_class = any(tt.start_time == start_time for tt in official_classes)
-        is_booked = any((b.start_time.strftime("%H:%M") == start_time) for b in existing_bookings)
+        is_official_class = any(
+            datetime.strptime(tt.start_time, "%H:%M").time() < slot_end.time()
+            and datetime.strptime(tt.end_time, "%H:%M").time() > slot_start.time()
+            for tt in official_classes
+        )
+        is_booked = any(b.start_time < slot_end and b.end_time > slot_start for b in existing_bookings)
         
         is_held = db.query(BookingHold).filter(
             BookingHold.room_id == room_id,
             BookingHold.status == "ACTIVE",
-            BookingHold.start_time <= req_date.replace(hour=int(start_time[:2]), minute=int(start_time[3:])),
-            BookingHold.end_time >= req_date.replace(hour=int(end_time[:2]), minute=int(end_time[3:])),
+            BookingHold.start_time < slot_end,
+            BookingHold.end_time > slot_start,
             BookingHold.expires_at > datetime.now()
         ).first() is not None
         
@@ -101,6 +109,8 @@ def get_room_availability(
     building_id: int = None,
     db: Session = Depends(get_db)
 ):
+    if AvailabilityService.expire_stale_holds(db):
+        db.commit()
     try:
         req_date = datetime.strptime(date_str, "%Y-%m-%d")
         
@@ -145,17 +155,12 @@ def hold_classroom(
     room = db.query(Room).filter(Room.id == request.room_id, Room.is_active.is_(True)).with_for_update().first()
     if not room:
         raise HTTPException(status_code=404, detail="Room not found")
-    overlap_booking = db.query(Booking.id).filter(
-        Booking.room_id == request.room_id, Booking.status == BookingStatus.CONFIRMED,
-        Booking.start_time < end_dt, Booking.end_time > start_dt,
-    ).first()
-    overlap_hold = db.query(BookingHold.id).filter(
-        BookingHold.room_id == request.room_id, BookingHold.status == "ACTIVE",
-        BookingHold.expires_at > datetime.now(), BookingHold.start_time < end_dt,
-        BookingHold.end_time > start_dt,
-    ).first()
-    if overlap_booking or overlap_hold:
-        raise HTTPException(status_code=409, detail="Room was just reserved for this period")
+    availability = AvailabilityService.check_room_availability(db, request.room_id, AvailabilityRequest(
+        date=start_dt, start_time=start_dt, end_time=end_dt,
+        required_capacity=request.expected_attendees, required_equipment_ids=[]
+    ))
+    if not availability.is_available:
+        raise HTTPException(status_code=409, detail=availability.details or "Room is not available")
     hold = BookingHold(
         room_id=request.room_id,
         user_id=user.id,
@@ -192,12 +197,12 @@ def confirm_classroom_booking(
         hold.status = "EXPIRED"; db.commit()
         raise HTTPException(status_code=400, detail="Hold has expired")
 
-    conflict = db.query(Booking.id).filter(
-        Booking.room_id == hold.room_id, Booking.status == BookingStatus.CONFIRMED,
-        Booking.start_time < hold.end_time, Booking.end_time > hold.start_time,
-    ).first()
-    if conflict:
-        raise HTTPException(status_code=409, detail="Room is no longer available")
+    availability = AvailabilityService.check_room_availability(db, hold.room_id, AvailabilityRequest(
+        date=hold.date, start_time=hold.start_time, end_time=hold.end_time,
+        required_capacity=request.expected_attendees, required_equipment_ids=[]
+    ), ignore_hold_id=hold.id)
+    if not availability.is_available:
+        raise HTTPException(status_code=409, detail=availability.details or "Room is no longer available")
 
     room = db.query(Room).filter(Room.id == hold.room_id).first()
     room_type = room.room_type if room else "CLASSROOM"

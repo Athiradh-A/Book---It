@@ -32,6 +32,7 @@ class HoldRequest(BaseModel):
     room_id: int
     start_time: str
     end_time: str
+    expected_attendees: int = 1
 
 class HoldResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
