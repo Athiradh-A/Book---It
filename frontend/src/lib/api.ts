@@ -11,7 +11,7 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(undefined, (error) => {
   if (error.response?.status === 401) {
     localStorage.removeItem('token')
-    if (location.pathname !== '/login') location.assign('/login')
+    if (!location.hash.startsWith('#/login')) location.hash = '#/login'
   }
   return Promise.reject(error)
 })

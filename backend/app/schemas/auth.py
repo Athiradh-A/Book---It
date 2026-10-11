@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr
-from typing import Optional
+from typing import Optional, List
 
 class Token(BaseModel):
     access_token: str
@@ -25,6 +25,9 @@ class UserOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+class UserSession(UserOut):
+    roles: List[str] = []
 
 class LoginRequest(BaseModel):
     username: str

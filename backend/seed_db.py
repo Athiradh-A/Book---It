@@ -14,7 +14,7 @@ load_dotenv(dotenv_path=env_path)
 from datetime import datetime, date, timedelta
 
 def import_timetable_csv(db: Session):
-    csv_path = Path(__file__).resolve().parent.parent.parent / "room_timetable_monday_friday.csv"
+    csv_path = Path(__file__).resolve().parent / "data" / "room_timetable_monday_friday.csv"
     if not csv_path.exists():
         print(f"CSV file not found at {csv_path}")
         return

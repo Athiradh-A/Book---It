@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Text, Float, Enum as SQLEnum
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Text, Float, Enum as SQLEnum, UniqueConstraint
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.db.session import Base
@@ -213,6 +213,40 @@ class AmenityBooking(Base):
     decided_at = Column(DateTime(timezone=True))
 
     amenity = relationship("Amenity")
+
+class RegistrationEvent(Base):
+    __tablename__ = "registration_events"
+    id = Column(Integer, primary_key=True, index=True)
+    faculty_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    room_id = Column(Integer, ForeignKey("rooms.id"), nullable=True)
+    name = Column(String, nullable=False)
+    description = Column(Text)
+    starts_at = Column(DateTime, nullable=False)
+    registration_deadline = Column(DateTime)
+    capacity = Column(Integer, nullable=False)
+    published = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    room = relationship("Room")
+
+class EventTicketAllocation(Base):
+    __tablename__ = "event_ticket_allocations"
+    __table_args__ = (
+        UniqueConstraint("event_id", "student_id", name="uq_event_student_ticket"),
+        UniqueConstraint("event_id", "roll_number", name="uq_event_roll_ticket"),
+    )
+    id = Column(Integer, primary_key=True, index=True)
+    event_id = Column(Integer, ForeignKey("registration_events.id", ondelete="CASCADE"), nullable=False, index=True)
+    student_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    roll_number = Column(String, nullable=False)
+    participant_name = Column(String, nullable=False)
+    department = Column(String, nullable=False)
+    status = Column(String, nullable=False, default="HELD")
+    booking_id = Column(String, nullable=False, unique=True, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    expires_at = Column(DateTime)
+
+    event = relationship("RegistrationEvent")
 
 # Add back-relationship for Building
 Building.rooms = relationship("Room", back_populates="building")

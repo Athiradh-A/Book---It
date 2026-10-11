@@ -1,91 +1,11 @@
-import React, { useState, useEffect } from "react"
-import { api } from "../lib/api"
-
-function EventRequest() {
-    const [form, setForm] = useState({
-        event_name: "",
-        description: "",
-        date: "",
-        start_time: "",
-        end_time: "",
-        expected_attendees: 50,
-        room_id: "",
-        academic_block: ""
-    })
-    const [status, setStatus] = useState("")
-
-    const handleSubmit = async (e) => {
-        e.preventDefault()
-        try {
-            await api.post("/events/request", {
-                ...form,
-                date: new Date(form.date),
-                start_time: new Date(form.date + "T" + form.start_time),
-                end_time: new Date(form.date + "T" + form.end_time),
-                room_id: parseInt(form.room_id),
-                academic_block: form.academic_block
-            })
-            setStatus("Success! Your request has been submitted for approval.")
-        } catch (err) {
-            setStatus("Error submitting request. Please check your details.")
-        }
-    }
-
-    return (
-        <div className="p-6 bg-gray-50 min-h-screen">
-            <h1 className="text-2xl font-bold mb-6">Request a Hall/Auditorium</h1>
-            <div className="max-w-2xl mx-auto bg-white p-8 rounded-lg shadow">
-                <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-4">
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700">Event Name</label>
-                        <input type="text" className="w-full p-2 border rounded mt-1" value={form.event_name} onChange={e => setForm({...form, event_name: e.target.value})} required />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700">Description</label>
-                        <textarea className="w-full p-2 border rounded mt-1" rows="3" value={form.description} onChange={e => setForm({...form, description: e.target.value})} required></textarea>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700">Date</label>
-                            <input type="date" className="w-full p-2 border rounded mt-1" value={form.date} onChange={e => setForm({...form, date: e.target.value})} required />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700">Academic Block</label>
-                            <select className="w-full p-2 border rounded mt-1" value={form.academic_block} onChange={e => setForm({...form, academic_block: e.target.value})} required>
-                                <option value="">Select Block</option>
-                                <option value="AB-1">AB-1</option>
-                                <option value="AB-2">AB-2</option>
-                                <option value="AB-3">AB-3</option>
-                                <option value="AB-4">AB-4</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700">Room ID (Hall/Auditorium)</label>
-                            <input type="number" className="w-full p-2 border rounded mt-1" value={form.room_id} onChange={e => setForm({...form, room_id: e.target.value})} required />
-                        </div>
-                        <div className="hidden"></div> {/* spacer */}
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700">Start Time</label>
-                            <input type="time" className="w-full p-2 border rounded mt-1" value={form.start_time} onChange={e => setForm({...form, start_time: e.target.value})} required />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700">End Time</label>
-                            <input type="time" className="w-full p-2 border rounded mt-1" value={form.end_time} onChange={e => setForm({...form, end_time: e.target.value})} required />
-                        </div>
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700">Expected Attendees</label>
-                        <input type="number" className="w-full p-2 border rounded mt-1" value={form.expected_attendees} onChange={e => setForm({...form, expected_attendees: e.target.value})} required />
-                    </div>
-                    <button type="submit" className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 font-bold">Submit Request</button>
-                    {status && <p className="mt-4 text-center font-semibold" style={{color: status.startsWith("Success") ? "green" : "red"}}>{status}</p>}
-                </form>
-            </div>
-        </div>
-    )
+import { useEffect, useState } from 'react'
+import { ArrowRight, CalendarDays } from 'lucide-react'
+import { api, messageFrom } from '../lib/api'
+type Room={id:number;code:string;room_type:string;capacity:number;academic_block?:string}
+export default function EventRequest(){
+  const [rooms,setRooms]=useState<Room[]>([]),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false)
+  const [form,setForm]=useState({event_name:'',event_category:'GENERAL',description:'',date:'',start_time:'',end_time:'',expected_attendees:50,room_id:''})
+  useEffect(()=>{api.get('/resources/rooms').then(r=>setRooms(r.data.filter((x:Room)=>['HALL','AUDITORIUM'].includes(x.room_type)))).catch(e=>setNotice(messageFrom(e)))},[])
+  const submit=async(e:React.FormEvent)=>{e.preventDefault();if(form.end_time<=form.start_time){setNotice('End time must be after start time.');return}setBusy(true);try{await api.post('/events/request',{...form,room_id:Number(form.room_id),date:`${form.date}T00:00:00`,start_time:`${form.date}T${form.start_time}:00`,end_time:`${form.date}T${form.end_time}:00`,expected_attendees:Number(form.expected_attendees)});setNotice('Event request submitted. Track each decision from My bookings.');setForm({...form,event_name:'',description:''})}catch(err){setNotice(messageFrom(err))}finally{setBusy(false)}}
+  return <div className="event-page"><section className="event-hero"><p className="kicker">HALLS & EVENTS</p><h1>Big ideas<br/><em>need a room.</em></h1><div className="event-disc"><CalendarDays/><span>REVIEWED<br/>WITH CARE</span></div></section><section className="event-workspace"><div className="event-intro"><p className="kicker">REQUEST A HALL</p><h2>One form.<br/>A visible approval trail.</h2><p>Your request starts with the faculty coordinator and progresses according to campus policy. The hall is reserved only after final approval.</p></div><form className="event-form" onSubmit={submit}>{notice&&<div className="booking-notice wide">{notice}</div>}<label className="wide">Event name<input required value={form.event_name} onChange={e=>setForm({...form,event_name:e.target.value})}/></label><label>Category<select value={form.event_category} onChange={e=>setForm({...form,event_category:e.target.value})}><option value="GENERAL">General</option><option value="ACADEMIC">Academic</option><option value="CULTURAL">Cultural</option><option value="MAJOR">Major event</option></select></label><label>Preferred hall<select required value={form.room_id} onChange={e=>setForm({...form,room_id:e.target.value})}><option value="">Select a hall</option>{rooms.map(r=><option key={r.id} value={r.id}>{r.code} · {r.capacity} people</option>)}</select></label><label>Date<input type="date" required value={form.date} onChange={e=>setForm({...form,date:e.target.value})}/></label><label>Expected attendance<input type="number" min="1" required value={form.expected_attendees} onChange={e=>setForm({...form,expected_attendees:Number(e.target.value)})}/></label><label>Starts<input type="time" required value={form.start_time} onChange={e=>setForm({...form,start_time:e.target.value})}/></label><label>Ends<input type="time" required value={form.end_time} onChange={e=>setForm({...form,end_time:e.target.value})}/></label><label className="wide">Tell us about the event<textarea required minLength={10} value={form.description} onChange={e=>setForm({...form,description:e.target.value})}/></label><button className="event-submit wide" disabled={busy}>{busy?'Submitting…':'Send for approval'} <ArrowRight/></button></form></section></div>
 }
-export default EventRequest

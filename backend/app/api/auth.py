@@ -2,7 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.models.models import User, Role, UserRole
-from app.schemas.auth import LoginRequest, Token, UserCreate, UserOut
+from app.schemas.auth import LoginRequest, Token, UserCreate, UserOut, UserSession
+from app.api.deps import get_current_user
 from app.core.security import verify_password, get_password_hash, create_access_token, create_refresh_token, decode_token
 from jose.exceptions import JWTError
 
@@ -61,6 +62,21 @@ def register(user_in: UserCreate, db: Session = Depends(get_db)):
         full_name=user_in.full_name
     )
     db.add(new_user)
+    db.flush()
+    student_role = db.query(Role).filter(Role.name == "STUDENT").first()
+    if not student_role:
+        student_role = Role(name="STUDENT")
+        db.add(student_role)
+        db.flush()
+    db.add(UserRole(user_id=new_user.id, role_id=student_role.id))
     db.commit()
     db.refresh(new_user)
     return new_user
+
+@router.get("/me", response_model=UserSession)
+def current_session(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    roles = [name for (name,) in db.query(Role.name).join(UserRole, UserRole.role_id == Role.id).filter(UserRole.user_id == user.id).all()]
+    return UserSession(
+        id=user.id, username=user.username, email=user.email,
+        full_name=user.full_name, is_active=user.is_active, roles=roles
+    )

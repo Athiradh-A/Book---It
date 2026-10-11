@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { api, messageFrom } from '../lib/api'
 
 function Login() {
@@ -7,13 +7,18 @@ function Login() {
     const [password, setPassword] = useState('')
     const [error, setError] = useState('')
     const navigate = useNavigate()
+    const [searchParams] = useSearchParams()
 
     const handleLogin = async (e) => {
         e.preventDefault()
         try {
             const res = await api.post('/auth/login', { username, password })
             localStorage.setItem('token', res.data.access_token)
-            navigate('/dashboard')
+            const requestedPath = searchParams.get('next')
+            const destination = requestedPath?.startsWith('/') && !requestedPath.startsWith('//')
+                ? requestedPath
+                : '/dashboard'
+            navigate(destination, { replace: true })
         } catch (err) {
             setError(messageFrom(err))
         }
