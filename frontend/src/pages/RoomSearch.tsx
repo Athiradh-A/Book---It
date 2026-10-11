@@ -103,7 +103,7 @@ function RoomSearch() {
                     <option value="AB-3">AB-3</option>
                     <option value="AB-4">AB-4</option>
                 </select>
-                <button onClick={searchRooms} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Search</button>
+                <button onClick={searchRooms} className="bg-[#D51F36] text-white px-4 py-2 rounded hover:bg-[#A91224]">Search</button>
             </div>
             {holdId && (
                 <div className="mb-6 p-4 bg-yellow-100 border border-yellow-400 rounded flex justify-between items-center">
@@ -120,7 +120,7 @@ function RoomSearch() {
                                 Available
                             </span>
                         </div>
-                        <button onClick={() => handleHold(room.room_id)} className="mt-3 w-full bg-blue-600 text-white py-1 rounded text-sm">Hold Room</button>
+                        <button onClick={() => handleHold(room.room_id)} className="mt-3 w-full bg-[#D51F36] text-white py-1 rounded text-sm">Hold Room</button>
                     </div>
                 ))}
             </div>

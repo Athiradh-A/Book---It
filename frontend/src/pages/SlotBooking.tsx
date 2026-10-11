@@ -69,7 +69,7 @@ function SlotBooking() {
 
     return (
         <div className="p-6 bg-gray-50 min-h-screen">
-            <button onClick={() => navigate(-1)} className="mb-4 text-blue-600 hover:underline">? Back to Search</button>
+            <button onClick={() => navigate(-1)} className="mb-4 text-[#D51F36] hover:underline">? Back to Search</button>
             <h1 className="text-2xl font-bold mb-2">Select a Time Slot</h1>
             <p className="mb-6 text-gray-600">Room ID: {roomId} | Date: {date}</p>
 
@@ -86,7 +86,7 @@ function SlotBooking() {
                         key={slot.slot} 
                         onClick={() => handleSlotClick(slot)}
                         className={`p-4 rounded-lg border transition-all ${
-                            slot.status === "AVAILABLE" ? "bg-white hover:bg-blue-50 border-gray-200" : 
+                            slot.status === "AVAILABLE" ? "bg-white hover:bg-[#F3DADD] border-gray-200" : 
                             slot.status === "TIMETABLE_OCCUPIED" ? "bg-gray-200 text-gray-500 cursor-not-allowed" : 
                             slot.status === "HELD" ? "bg-yellow-200 border-yellow-400 font-bold" :
                             "bg-red-100 text-red-600 cursor-not-allowed"
