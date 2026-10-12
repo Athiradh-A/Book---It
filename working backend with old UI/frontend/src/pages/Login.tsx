@@ -1,0 +1,35 @@
+import React, { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { api, messageFrom } from '../lib/api'
+
+function Login() {
+    const [username, setUsername] = useState('')
+    const [password, setPassword] = useState('')
+    const [error, setError] = useState('')
+    const navigate = useNavigate()
+
+    const handleLogin = async (e) => {
+        e.preventDefault()
+        try {
+            const res = await api.post('/auth/login', { username, password })
+            localStorage.setItem('token', res.data.access_token)
+            navigate('/dashboard')
+        } catch (err) {
+            setError(messageFrom(err))
+        }
+    }
+
+    return (
+        <div className="login-page"><a href="/" className="brand"><span>BOOK</span><i>•</i><span>IT</span></a>
+            <div className="login-card"><p className="kicker">WELCOME BACK</p><h1>Your campus,<br/><em>ready when you are.</em></h1>
+                {error && <p className="notice">{error}</p>}
+                <form onSubmit={handleLogin} className="form-grid">
+                    <label className="wide">Username<input type="text" value={username} onChange={(e) => setUsername(e.target.value)} required autoComplete="username" /></label>
+                    <label className="wide">Password<input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="current-password" /></label>
+                    <button type="submit" className="primary wide">Enter Book-It</button>
+                </form>
+            </div>
+        </div>
+    )
+}
+export default Login

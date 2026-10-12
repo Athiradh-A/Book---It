@@ -1,0 +1,2 @@
+/* Product wordmark: the internal package name remains CampusRoom for compatibility. */
+.brand{font-size:0;letter-spacing:0}.brand::after{content:'BOOkIT';font:700 28px 'Playfair Display';letter-spacing:-1.2px;color:var(--ink)}.brand i{display:none}
