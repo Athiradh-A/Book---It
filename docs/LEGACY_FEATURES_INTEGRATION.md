@@ -47,7 +47,7 @@ Inventory CSV columns: classroom_id, building, capacity, with optional room_type
 
 Timetable CSV columns: classroom_id, building, day_of_week, start_time, end_time, semester; optional columns are course_code, course_name, faculty_email, effective_from, effective_to. Days can be MON–SUN or 0–6 (Monday is 0). Times use 24-hour HH:MM. Each row is an occupied teaching period. Availability is calculated as periods not occupied by timetable entries, confirmed/pending classroom bookings, active holds, or maintenance.
 
-The sample CSV rows in backend/data are **illustrative only**. No official room list or class schedule was supplied with this change, so these samples must be replaced with the complete campus inventory and authoritative timetable before real-world use. The code cannot infer which classes are actually scheduled.
+For a selected date, the admin page can export the derived free-slot dataset as CSV; authenticated clients can also call GET /api/resources/timetables/free-slots?date=YYYY-MM-DD (JSON) or GET /api/resources/timetables/free-slots.csv?date=YYYY-MM-DD (CSV), optionally adding building=AB1. The sample CSV rows in backend/data are **illustrative only**. No official room list or class schedule was supplied with this change, so these samples must be replaced with the complete campus inventory and authoritative timetable before real-world use. The code cannot infer which classes are actually scheduled.
 
 ## Event approval workflow
 
