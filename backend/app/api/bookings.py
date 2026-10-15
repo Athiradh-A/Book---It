@@ -192,7 +192,7 @@ def confirm_classroom_booking(
             Booking.requester_id == user.id, Booking.room_id == hold.room_id,
             Booking.start_time == hold.start_time, Booking.end_time == hold.end_time,
         ).first()
-        return {"message": "Booking already confirmed", "booking_id": booking.id if booking else None}
+        return {"message": "Classroom request already submitted", "booking_id": booking.id if booking else None, "status": booking.status.value if booking else "UNKNOWN"}
     if hold.status != "ACTIVE" or hold.expires_at < datetime.now():
         hold.status = "EXPIRED"; db.commit()
         raise HTTPException(status_code=400, detail="Hold has expired")
