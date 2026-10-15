@@ -3,6 +3,8 @@
 PowerShell:
   $env:BOOKIT_SEED_DEMO_USERS = "1"
   $env:BOOKIT_DEMO_PASSWORD = "Choose-A-Local-Password"
+  # Optional: reset existing demo-account passwords to the chosen password
+  $env:BOOKIT_RESET_DEMO_PASSWORDS = "1"
   python backend/scripts/seed_demo_users.py
 """
 import os
@@ -46,6 +48,9 @@ try:
         if not user:
             user = User(username=username, email=email, full_name=full_name, hashed_password=get_password_hash(password), is_active=True)
             db.add(user); db.flush(); created.append(username)
+        elif os.getenv("BOOKIT_RESET_DEMO_PASSWORDS") == "1":
+            user.hashed_password = get_password_hash(password)
+            user.is_active = True
         link = db.query(UserRole).filter(UserRole.user_id == user.id, UserRole.role_id == roles[role_name].id).first()
         if not link:
             db.add(UserRole(user_id=user.id, role_id=roles[role_name].id))
