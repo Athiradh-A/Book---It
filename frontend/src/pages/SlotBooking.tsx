@@ -29,7 +29,7 @@ export default function SlotBooking() {
     if(!selectedSlots.length)return
     try{const {data}=await api.post('/bookings/classroom/hold',{room_id:roomId,start_time:`${date}T${selectedSlots[0].start}:00`,end_time:`${date}T${selectedSlots.at(-1)!.end}:00`,expected_attendees:attendees});setHold({id:data.hold_id,expiresAt:new Date(data.expires_at).getTime()});setNotice('Space secured. Confirm before the timer reaches zero.')}catch(e){setNotice(messageFrom(e));load()}
   }
-  const confirm=async()=>{if(!hold)return;try{await api.post('/bookings/classroom/confirm',{hold_id:hold.id,purpose,expected_attendees:attendees});setNotice('Booking confirmed — the room is yours.');setHold(null);setSelected([]);load()}catch(e){setNotice(messageFrom(e))}}
+  const confirm=async()=>{if(!hold)return;try{await api.post('/bookings/classroom/confirm',{hold_id:hold.id,purpose,expected_attendees:attendees});setNotice('Booking request submitted. The room will be confirmed after faculty approval.');setHold(null);setSelected([]);load()}catch(e){setNotice(messageFrom(e))}}
   const clock=`${String(Math.floor(seconds/60)).padStart(2,'0')}:${String(seconds%60).padStart(2,'0')}`
   if(!roomId||!date)return <div className="content-wrap"><div className="empty">Room or date is missing.</div></div>
 
