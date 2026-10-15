@@ -19,6 +19,7 @@ export default function EventRequest(){
     setForm(initialForm);setDocuments([]);await load()
   }catch(err){setNotice(messageFrom(err))}finally{setBusy(false)}}
   const viewHistory=async(id:number)=>{try{const {data}=await api.get(`/events/${id}/history`);setHistory(data)}catch(e){setNotice(messageFrom(e))}}
+  const downloadDocument=async(eventId:number,file:any)=>{try{const {data}=await api.get(`/events/${eventId}/documents/${document.id}`,{responseType:'blob'});const url=URL.createObjectURL(data);const a=window.document.createElement('a');a.href=url;a.download=file.original_name;a.click();URL.revokeObjectURL(url)}catch(e){setNotice(messageFrom(e))}}
   const requestMeeting=async(id:number)=>{const reason=window.prompt('Briefly explain why a meeting is needed (at least 5 characters):');if(!reason?.trim())return;try{await api.post(`/events/${id}/meeting-requests`,{reason:reason.trim()});setNotice('Meeting request recorded.');await viewHistory(id)}catch(e){setNotice(messageFrom(e))}}
   const update=(key:string,value:any)=>setForm(x=>({...x,[key]:value}))
   return <div className="event-page">
