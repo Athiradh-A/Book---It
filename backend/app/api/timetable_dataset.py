@@ -45,7 +45,7 @@ async def import_classroom_dataset(file: UploadFile = File(...), db: Session = D
             if start >= end:
                 raise ValueError("end_time must be later than start_time")
             effective_from = datetime.strptime(row["effective_from"], "%Y-%m-%d") if row.get("effective_from") else datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
-            effective_to = datetime.strptime(row["effective_to"], "%Y-%m-%d") if row.get("effective_to") else datetime(2099, 12, 31)
+            effective_to = datetime.strptime(row["effective_to"], "%Y-%m-%d").replace(hour=23, minute=59, second=59) if row.get("effective_to") else datetime(2099, 12, 31, 23, 59, 59)
             if effective_to < effective_from:
                 raise ValueError("effective_to must not precede effective_from")
             course_id = None
