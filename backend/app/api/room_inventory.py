@@ -30,6 +30,8 @@ async def import_room_inventory(file: UploadFile = File(...), db: Session = Depe
         try:
             code = row["classroom_id"].upper()
             building_code = row["building"].upper().replace("-", "")
+            if building_code not in {"AB1", "AB2", "AB3", "AB4"}:
+                raise ValueError("building must be AB1, AB2, AB3, or AB4")
             if not ROOM_CODE.fullmatch(code):
                 raise ValueError("classroom_id must follow a pattern such as C-101 (letter, hyphen, three digits)")
             capacity = int(row["capacity"])
@@ -40,7 +42,7 @@ async def import_room_inventory(file: UploadFile = File(...), db: Session = Depe
                 building = Building(code=building_code, name=f"Academic Block {building_code[-1]}")
                 db.add(building); db.flush()
             candidates = db.query(Room).filter(Room.code.ilike(code)).all()
-            room = next((candidate for candidate in candidates if (candidate.academic_block or "").replace("-", "").upper() == building_code), None)
+            room = next((candidate for candidate in candidates if (candidate.academic_block or "").replace("-", "").upper() == building_code or candidate.building_id == building.id), None)
             if room:
                 room.capacity = capacity
                 room.room_type = row.get("room_type") or "CLASSROOM"
