@@ -39,7 +39,8 @@ async def import_room_inventory(file: UploadFile = File(...), db: Session = Depe
             if not building:
                 building = Building(code=building_code, name=f"Academic Block {building_code[-1]}")
                 db.add(building); db.flush()
-            room = db.query(Room).filter(Room.code.ilike(code), Room.academic_block.ilike(building_code)).first()
+            candidates = db.query(Room).filter(Room.code.ilike(code)).all()
+            room = next((candidate for candidate in candidates if (candidate.academic_block or "").replace("-", "").upper() == building_code), None)
             if room:
                 room.capacity = capacity
                 room.room_type = row.get("room_type") or "CLASSROOM"
