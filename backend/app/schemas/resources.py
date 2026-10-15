@@ -29,7 +29,7 @@ class EquipmentOut(EquipmentBase):
 # --- Room Schemas ---
 class RoomBase(BaseModel):
     code: str
-    building_id: int
+    building_id: Optional[int] = None
     academic_block: Optional[str] = None
     room_type: str
     capacity: int = Field(..., ge=1)
