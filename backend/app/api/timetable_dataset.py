@@ -30,9 +30,10 @@ async def import_classroom_dataset(file: UploadFile = File(...), db: Session = D
         try:
             code, building_code = row["classroom_id"].upper(), row["building"].upper()
             building = db.query(Building).filter(Building.code.ilike(building_code)).first()
-            room_query = db.query(Room).filter(Room.code.ilike(code))
-            room_query = room_query.filter((Room.academic_block.ilike(building_code)) | (Room.building_id == building.id)) if building else room_query.filter(Room.academic_block.ilike(building_code))
-            room = room_query.first()
+            candidates = db.query(Room).filter(Room.code.ilike(code)).all()
+            room = next((candidate for candidate in candidates if
+                (candidate.academic_block or "").replace("-", "").upper() == building_code or
+                (building is not None and candidate.building_id == building.id)), None)
             if not room:
                 raise ValueError(f"Classroom {code} was not found in building {building_code}; create the room inventory first")
             day_raw = row["day_of_week"].strip().upper()
