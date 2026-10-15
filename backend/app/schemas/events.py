@@ -28,6 +28,8 @@ class EventRequestOut(BaseModel):
     id: int
     room_id: int
     event_name: str
+    event_category: Optional[str] = None
+    description: Optional[str] = None
     status: BookingStatus
     current_approval_level: int
     requested_by: int
