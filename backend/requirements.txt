@@ -13,3 +13,5 @@ openpyxl
 ortools
 pytest
 httpx
+python-multipart
+python-dotenv
