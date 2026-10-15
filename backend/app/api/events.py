@@ -9,7 +9,7 @@ from app.models.models import EventRequest, Notification, BookingStatus, Role, U
 
 router = APIRouter(prefix="/events", tags=["Events"])
 
-@router.post("/request", response_model=EventRequestOut)
+@router.post("/request", response_model=EventRequestOut, dependencies=[Depends(require_role(["STUDENT"]))])
 def request_event(event_in: EventRequestCreate, db: Session = Depends(get_db), user=Depends(get_current_user)):
     return EventService.create_event_request(db, user.id, event_in)
 
