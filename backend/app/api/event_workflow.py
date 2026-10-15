@@ -115,3 +115,19 @@ def resolve_meeting(event_id: int, meeting_id: int, payload: dict, db: Session =
     db.add(ApprovalStep(event_request_id=event.id, level=meeting.approval_level, approver_id=user.id, decision=f"MEETING_{status_value}", comment=note))
     db.commit()
     return {"id": meeting.id, "status": meeting.status, "resolution_note": meeting.resolution_note}
+
+from fastapi.responses import FileResponse
+
+@router.get("/{event_id}/documents/{document_id}")
+def download_event_document(event_id: int, document_id: int, db: Session = Depends(get_db), user=Depends(get_current_user), roles=Depends(get_current_user_roles)):
+    event = db.query(EventRequest).filter(EventRequest.id == event_id).first()
+    document = db.query(EventDocument).filter(EventDocument.id == document_id, EventDocument.event_request_id == event_id).first()
+    if not event or not document:
+        raise HTTPException(404, "Document not found")
+    if not _can_view(event, user, roles):
+        raise HTTPException(403, "You cannot access this document")
+    root = Path(os.getenv("BOOKIT_UPLOAD_DIR", Path(__file__).resolve().parents[2] / "uploads" / "event_documents"))
+    path = root / document.stored_name
+    if not path.is_file():
+        raise HTTPException(404, "The stored file is not available on this server")
+    return FileResponse(path, media_type=document.mime_type or "application/octet-stream", filename=document.original_name)
