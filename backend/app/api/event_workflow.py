@@ -4,6 +4,7 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from app.api.deps import get_current_user, get_current_user_roles, require_role
 from app.db.session import get_db
@@ -115,8 +116,6 @@ def resolve_meeting(event_id: int, meeting_id: int, payload: dict, db: Session =
     db.add(ApprovalStep(event_request_id=event.id, level=meeting.approval_level, approver_id=user.id, decision=f"MEETING_{status_value}", comment=note))
     db.commit()
     return {"id": meeting.id, "status": meeting.status, "resolution_note": meeting.resolution_note}
-
-from fastapi.responses import FileResponse
 
 @router.get("/{event_id}/documents/{document_id}")
 def download_event_document(event_id: int, document_id: int, db: Session = Depends(get_db), user=Depends(get_current_user), roles=Depends(get_current_user_roles)):
