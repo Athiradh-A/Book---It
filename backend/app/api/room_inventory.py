@@ -48,6 +48,7 @@ async def import_room_inventory(file: UploadFile = File(...), db: Session = Depe
                 room.room_type = row.get("room_type") or "CLASSROOM"
                 room.is_active = row.get("active", "true").lower() not in {"false", "0", "no", "inactive"}
                 room.building_id = building.id
+                room.academic_block = building_code
                 updated += 1
             else:
                 room = Room(code=code, building_id=building.id, academic_block=building_code, room_type=row.get("room_type") or "CLASSROOM", capacity=capacity, is_active=row.get("active", "true").lower() not in {"false", "0", "no", "inactive"})
