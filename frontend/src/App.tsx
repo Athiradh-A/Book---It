@@ -10,6 +10,7 @@ import MyBookings from './pages/MyBookings'
 import Shell from './components/Shell'
 import Approvals from './pages/Approvals'
 import EventRegistration from './pages/EventRegistration'
+import TimetableAdmin from './pages/TimetableAdmin'
 
 function Protected({ children }: { children: React.ReactNode }) {
     const location = useLocation()
@@ -32,6 +33,7 @@ function App() {
                     <Route path='/amenities' element={<Amenities />} />
                     <Route path='/bookings' element={<MyBookings />} />
                     <Route path='/approvals' element={<Approvals />} />
+                    <Route path='/admin/timetable' element={<TimetableAdmin />} />
                 </Route>
                 <Route path='*' element={<Navigate to='/' />} />
             </Routes>

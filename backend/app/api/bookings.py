@@ -5,8 +5,8 @@ from datetime import datetime, timedelta
 from app.db.session import get_db
 from app.schemas.bookings import AvailabilityRequest, AvailabilityResponse, HoldRequest, HoldResponse, ConfirmRequest
 from app.services.availability_service import AvailabilityService
-from app.models.models import BookingHold, Booking, BookingStatus, Room, Timetable
-from app.api.deps import get_current_user
+from app.models.models import BookingHold, Booking, BookingStatus, Room, Timetable, AuditLog, Notification
+from app.api.deps import get_current_user, require_role
 
 router = APIRouter(prefix="/bookings", tags=["Bookings"])
 
@@ -41,7 +41,7 @@ def get_room_slots(
     # 2. Get existing user bookings
     existing_bookings = db.query(Booking).filter(
         Booking.room_id == room_id,
-        Booking.status == BookingStatus.CONFIRMED,
+        Booking.status.in_([BookingStatus.CONFIRMED, BookingStatus.PENDING_FACULTY_APPROVAL]),
         Booking.date >= req_date.replace(hour=0, minute=0, second=0, microsecond=0),
         Booking.date <= req_date.replace(hour=23, minute=59, second=59, microsecond=999999)
     ).all()
@@ -192,7 +192,7 @@ def confirm_classroom_booking(
             Booking.requester_id == user.id, Booking.room_id == hold.room_id,
             Booking.start_time == hold.start_time, Booking.end_time == hold.end_time,
         ).first()
-        return {"message": "Booking already confirmed", "booking_id": booking.id if booking else None}
+        return {"message": "Classroom request already submitted", "booking_id": booking.id if booking else None, "status": booking.status.value if booking else "UNKNOWN"}
     if hold.status != "ACTIVE" or hold.expires_at < datetime.now():
         hold.status = "EXPIRED"; db.commit()
         raise HTTPException(status_code=400, detail="Hold has expired")
@@ -214,29 +214,64 @@ def confirm_classroom_booking(
         date=hold.date,
         start_time=hold.start_time,
         end_time=hold.end_time,
-        status=BookingStatus.CONFIRMED,
+        status=BookingStatus.PENDING_FACULTY_APPROVAL,
         purpose=request.purpose,
         expected_attendees=request.expected_attendees
     )
     
     hold.status = "CONVERTED"
     db.add(booking)
+    db.flush()
+    db.add(Notification(user_id=user.id, message=f"Your classroom request for {room.code if room else hold.room_id} is waiting for faculty approval."))
     db.commit()
     
-    return {"message": "Booking confirmed successfully", "booking_id": booking.id}
+    return {"message": "Classroom request submitted for faculty approval", "booking_id": booking.id, "status": booking.status.value}
+
+@router.get("/pending", dependencies=[Depends(require_role(["FACULTY", "ADMIN"]))])
+def pending_classroom_requests(db: Session = Depends(get_db)):
+    rows = db.query(Booking).filter(Booking.booking_type == "CLASSROOM", Booking.status == BookingStatus.PENDING_FACULTY_APPROVAL).order_by(Booking.start_time).all()
+    return [{"id": b.id, "room_id": b.room_id, "requester_id": b.requester_id, "start_time": b.start_time, "end_time": b.end_time, "purpose": b.purpose, "expected_attendees": b.expected_attendees, "status": b.status.value} for b in rows]
+
+@router.post("/{booking_id}/decision", dependencies=[Depends(require_role(["FACULTY", "ADMIN"]))])
+def decide_classroom_request(booking_id: int, payload: dict, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    booking = db.query(Booking).filter(Booking.id == booking_id).with_for_update().first()
+    if not booking or booking.booking_type != "CLASSROOM" or booking.status != BookingStatus.PENDING_FACULTY_APPROVAL:
+        raise HTTPException(409, "Classroom request is not awaiting faculty approval")
+    decision = str(payload.get("decision", "")).upper()
+    comment = str(payload.get("comment", "")).strip()
+    if decision not in {"APPROVED", "REJECTED", "RETURNED"}:
+        raise HTTPException(422, "Decision must be APPROVED, REJECTED, or RETURNED")
+    if not comment:
+        raise HTTPException(422, "A decision comment is required")
+    if decision == "APPROVED":
+        req = AvailabilityRequest(date=booking.date, start_time=booking.start_time, end_time=booking.end_time, required_capacity=booking.expected_attendees or 1, required_equipment_ids=[])
+        conflict = AvailabilityService.check_room_availability(db, booking.room_id, req, ignore_booking_id=booking.id)
+        if not conflict.is_available:
+            raise HTTPException(409, f"Cannot approve this request: {conflict.details or conflict.conflict_type}")
+        booking.status = BookingStatus.CONFIRMED
+        booking.confirmed_at = datetime.utcnow()
+    elif decision == "REJECTED":
+        booking.status = BookingStatus.REJECTED
+    else:
+        booking.status = BookingStatus.RETURNED_FOR_CHANGES
+    booking.decision_comment = comment
+    db.add(AuditLog(user_id=user.id, action=f"CLASSROOM_{decision}", entity="Booking", entity_id=booking.id, changes=comment))
+    db.add(Notification(user_id=booking.requester_id, message=f"Your classroom request was {decision.lower().replace('_', ' ')}: {comment}"))
+    db.commit()
+    return {"id": booking.id, "status": booking.status.value, "decision_comment": booking.decision_comment}
 
 @router.get("/my")
 def my_bookings(db: Session = Depends(get_db), user=Depends(get_current_user)):
     bookings = db.query(Booking).filter(Booking.requester_id == user.id).order_by(Booking.start_time.desc()).all()
     return [{"id": b.id, "room_id": b.room_id, "booking_type": b.booking_type, "start_time": b.start_time,
-             "end_time": b.end_time, "status": b.status.value, "purpose": b.purpose} for b in bookings]
+             "end_time": b.end_time, "status": b.status.value, "purpose": b.purpose, "decision_comment": b.decision_comment} for b in bookings]
 
 @router.post("/{booking_id}/cancel")
 def cancel_booking(booking_id: int, db: Session = Depends(get_db), user=Depends(get_current_user)):
     booking = db.query(Booking).filter(Booking.id == booking_id, Booking.requester_id == user.id).with_for_update().first()
     if not booking:
         raise HTTPException(status_code=404, detail="Booking not found")
-    if booking.status != BookingStatus.CONFIRMED or booking.start_time <= datetime.now():
+    if booking.status not in {BookingStatus.CONFIRMED, BookingStatus.PENDING_FACULTY_APPROVAL} or booking.start_time <= datetime.now():
         raise HTTPException(status_code=409, detail="This booking cannot be cancelled")
     booking.status = BookingStatus.CANCELLED; db.commit()
     return {"message": "Booking cancelled"}

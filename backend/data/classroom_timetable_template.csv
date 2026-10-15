@@ -1,0 +1,6 @@
+classroom_id,building,day_of_week,start_time,end_time,semester,course_code,course_name,faculty_email,effective_from,effective_to
+C-101,AB1,MON,08:00,08:50,2026-ODD,CS101,Introduction to Computing,,2026-07-01,2026-12-31
+W-101,AB1,TUE,09:40,10:30,2026-ODD,MA101,Engineering Mathematics,,2026-07-01,2026-12-31
+E-101,AB2,WED,10:45,11:35,2026-ODD,PH101,Engineering Physics,,2026-07-01,2026-12-31
+C-101,AB3,THU,13:15,14:05,2026-ODD,CS101,Introduction to Computing,,2026-07-01,2026-12-31
+W-101,AB4,FRI,14:05,14:55,2026-ODD,MA101,Engineering Mathematics,,2026-07-01,2026-12-31

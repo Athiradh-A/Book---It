@@ -29,11 +29,10 @@ class EquipmentOut(EquipmentBase):
 # --- Room Schemas ---
 class RoomBase(BaseModel):
     code: str
-    name: str
-    building_id: int
+    building_id: Optional[int] = None
+    academic_block: Optional[str] = None
     room_type: str
-    capacity: int
-    floor: Optional[int] = None
+    capacity: int = Field(..., ge=1)
     is_active: bool = True
 
 class RoomCreate(RoomBase):
@@ -41,8 +40,7 @@ class RoomCreate(RoomBase):
 
 class RoomOut(RoomBase):
     id: int
-    building: BuildingOut
-    equipment: List[EquipmentOut] = []
+    building: Optional[BuildingOut] = None
     class Config:
         from_attributes = True
 

@@ -20,11 +20,14 @@ function Login() {
                 password
             })
             localStorage.setItem('token', res.data.access_token)
+            const me = await api.get('/auth/me')
+            const roles: string[] = me.data.roles || []
             const requestedPath = searchParams.get('next')
+            const defaultDestination = roles.some((role) => ['WELFARE', 'DIRECTOR', 'EVENTS', 'ADMIN'].includes(role)) ? '/approvals' : '/dashboard'
             const destination =
                 requestedPath?.startsWith('/') && !requestedPath.startsWith('//')
                     ? requestedPath
-                    : '/'
+                    : defaultDestination
             navigate(destination, { replace: true })
         } catch (err) {
             setError(messageFrom(err))

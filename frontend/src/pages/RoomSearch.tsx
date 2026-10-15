@@ -22,7 +22,7 @@ export default function RoomSearch(){
         <div className="field-number">02</div><label>Time window<div className="time-pair"><input type="time" value={params.start} onChange={e=>setParams({...params,start:e.target.value})}/><span>—</span><input type="time" value={params.end} onChange={e=>setParams({...params,end:e.target.value})}/></div></label>
         <div className="field-number">03</div><label>People<div><Users/><input type="number" min="1" value={params.capacity} onChange={e=>setParams({...params,capacity:Number(e.target.value)})}/></div></label>
         <div className="field-number">04</div><label>Building<select value={params.buildingId} onChange={e=>setParams({...params,buildingId:e.target.value})}><option value="">Every building</option>{buildings.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}</select></label>
-        <div className="field-number">05</div><label>Academic block<select value={params.academicBlock} onChange={e=>setParams({...params,academicBlock:e.target.value})}><option value="">Every block</option>{['AB-1','AB-2','AB-3','AB-4'].map(x=><option key={x}>{x}</option>)}</select></label>
+        <div className="field-number">05</div><label>Academic block<select value={params.academicBlock} onChange={e=>setParams({...params,academicBlock:e.target.value})}><option value="">Every block</option>{['AB1','AB2','AB3','AB4'].map(x=><option key={x}>{x}</option>)}</select></label>
         <button className="finder-submit" type="submit" disabled={loading}><Search/>{loading?'Checking campus…':'Find available rooms'}</button>
       </form>
       <div className="results-head"><p className="kicker">LIVE RESULTS</p><span>{notice}</span></div>
