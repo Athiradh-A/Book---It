@@ -16,7 +16,7 @@ class AvailabilityService:
         return count
 
     @staticmethod
-    def check_room_availability(db: Session, room_id: int, req: AvailabilityRequest, ignore_hold_id: Optional[int] = None) -> ConflictInfo:
+    def check_room_availability(db: Session, room_id: int, req: AvailabilityRequest, ignore_hold_id: Optional[int] = None, ignore_booking_id: Optional[int] = None) -> ConflictInfo:
         AvailabilityService.expire_stale_holds(db)
         room = db.query(Room).filter(Room.id == room_id).first()
         if not room:
@@ -52,12 +52,15 @@ class AvailabilityService:
             if (req_start_time < tt_end) and (req_end_time > tt_start):
                 return ConflictInfo(room_id=room_id, code=room.code, is_available=False, conflict_type="TIMETABLE", details=f"Official timetable conflict: {tt.start_time} - {tt.end_time}")
 
-        overlapping_bookings = db.query(Booking).filter(
+        booking_query = db.query(Booking).filter(
             Booking.room_id == room_id,
-            Booking.status == BookingStatus.CONFIRMED,
+            Booking.status.in_([BookingStatus.CONFIRMED, BookingStatus.PENDING_FACULTY_APPROVAL]),
             Booking.start_time < req.end_time,
             Booking.end_time > req.start_time
-        ).first()
+        )
+        if ignore_booking_id is not None:
+            booking_query = booking_query.filter(Booking.id != ignore_booking_id)
+        overlapping_bookings = booking_query.first()
         if overlapping_bookings:
             return ConflictInfo(room_id=room_id, code=room.code, is_available=False, conflict_type="BOOKING", details=f"Confirmed booking conflict: {overlapping_bookings.start_time} to {overlapping_bookings.end_time}")
 
