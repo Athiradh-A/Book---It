@@ -264,7 +264,7 @@ def decide_classroom_request(booking_id: int, payload: dict, db: Session = Depen
 def my_bookings(db: Session = Depends(get_db), user=Depends(get_current_user)):
     bookings = db.query(Booking).filter(Booking.requester_id == user.id).order_by(Booking.start_time.desc()).all()
     return [{"id": b.id, "room_id": b.room_id, "booking_type": b.booking_type, "start_time": b.start_time,
-             "end_time": b.end_time, "status": b.status.value, "purpose": b.purpose} for b in bookings]
+             "end_time": b.end_time, "status": b.status.value, "purpose": b.purpose, "decision_comment": b.decision_comment} for b in bookings]
 
 @router.post("/{booking_id}/cancel")
 def cancel_booking(booking_id: int, db: Session = Depends(get_db), user=Depends(get_current_user)):
