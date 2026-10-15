@@ -7,9 +7,9 @@ type Proposal={id:number;event_name:string;status:string;current_approval_level:
 const initialForm={event_name:'',event_category:'GENERAL',description:'',date:'',start_time:'',end_time:'',expected_attendees:50,room_id:'',department:'',responsible_faculty:'',discipline_faculty:'',infrastructure_needs:'',catering_needs:'',vehicle_needs:'',accommodation_needs:'',funding_source:'',funding_amount:'',risk_assessment:''}
 
 export default function EventRequest(){
-  const [rooms,setRooms]=useState<Room[]>([]),[proposals,setProposals]=useState<Proposal[]>([]),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false)
+  const [rooms,setRooms]=useState<Room[]>([]),[proposals,setProposals]=useState<Proposal[]>([]),[roles,setRoles]=useState<string[]>([]),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false)
   const [form,setForm]=useState(initialForm),[documents,setDocuments]=useState<File[]>([]),[history,setHistory]=useState<any|null>(null)
-  const load=()=>Promise.all([api.get('/resources/rooms'),api.get('/events/my')]).then(([r,e])=>{setRooms(r.data.filter((x:Room)=>['HALL','AUDITORIUM'].includes(x.room_type)));setProposals(e.data)}).catch(e=>setNotice(messageFrom(e)))
+  const load=()=>Promise.all([api.get('/auth/me'),api.get('/resources/rooms'),api.get('/events/my')]).then(([m,r,e])=>{setRoles(m.data.roles||[]);setRooms(r.data.filter((x:Room)=>['HALL','AUDITORIUM'].includes(x.room_type)));setProposals(e.data)}).catch(e=>setNotice(messageFrom(e)))
   useEffect(()=>{load()},[])
   const submit=async(e:React.FormEvent)=>{e.preventDefault();if(form.end_time<=form.start_time){setNotice('End time must be after start time.');return}setBusy(true);setNotice('');try{
     const payload={...form,room_id:Number(form.room_id),date:`${form.date}T00:00:00`,start_time:`${form.date}T${form.start_time}:00`,end_time:`${form.date}T${form.end_time}:00`,expected_attendees:Number(form.expected_attendees),funding_amount:form.funding_amount?Number(form.funding_amount):null}
@@ -23,7 +23,7 @@ export default function EventRequest(){
   const update=(key:string,value:any)=>setForm(x=>({...x,[key]:value}))
   return <div className="event-page">
     <section className="event-hero"><p className="kicker">HALLS & EVENTS</p><h1>Big ideas<br/><em>need a room.</em></h1><div className="event-disc"><CalendarDays/><span>FOUR-STAGE<br/>APPROVAL</span></div></section>
-    <section className="event-workspace"><div className="event-intro"><p className="kicker">DETAILED EVENT PROPOSAL</p><h2>One proposal.<br/>A visible approval trail.</h2><p>Submit the event plan, supporting documents, funding and logistics. A temporary hall hold is created after Student Welfare approval and is rechecked before final confirmation.</p></div>
+    {roles.includes('STUDENT')&&<section className="event-workspace"><div className="event-intro"><p className="kicker">DETAILED EVENT PROPOSAL</p><h2>One proposal.<br/>A visible approval trail.</h2><p>Submit the event plan, supporting documents, funding and logistics. A temporary hall hold is created after Student Welfare approval and is rechecked before final confirmation.</p></div>
     <form className="event-form" onSubmit={submit}>
       {notice&&<div className="booking-notice wide" role="status">{notice}</div>}
       <label className="wide">Event name<input required minLength={3} value={form.event_name} onChange={e=>update('event_name',e.target.value)}/></label>
@@ -46,7 +46,8 @@ export default function EventRequest(){
       <label className="wide">Risk assessment / safety plan<textarea value={form.risk_assessment} onChange={e=>update('risk_assessment',e.target.value)}/></label>
       <label className="wide">Supporting documents (PDF, DOC/DOCX, images, XLSX, PPTX; max 10 MB each)<input type="file" multiple accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.xlsx,.pptx" onChange={e=>setDocuments(Array.from(e.target.files||[]))}/><small>{documents.length?documents.map(x=>x.name).join(', '):'Attach proposals, approvals, quotations or safety documents.'}</small></label>
       <button className="event-submit wide" disabled={busy}>{busy?'Submitting proposal…':'Submit full proposal'} <ArrowRight/></button>
-    </form></section>
+    </form></section>}
+    {!roles.includes('STUDENT')&&<div className="booking-notice">Event proposals are submitted by student accounts. Use the approvals workspace for your assigned role.</div>}
     <section className="approval-body"><div className="ticket-heading"><div><p className="kicker">YOUR SUBMISSIONS</p><h2>Proposal tracking</h2></div><span>{proposals.length} REQUEST{proposals.length===1?'':'S'}</span></div>
       <div className="approval-list">{proposals.map(p=><article key={p.id}><div className="approval-index">#{p.id}</div><div><p className="kicker">{String(p.status).replaceAll('_',' ')}</p><h2>{p.event_name}</h2><p>Hall ID {p.room_id} · {p.expected_attendees} attendees · Stage {p.current_approval_level}/4</p></div><div className="decision-box"><button onClick={()=>viewHistory(p.id)}><FileText/> Approval history</button><button onClick={()=>requestMeeting(p.id)}><Clock3/> Request meeting</button></div></article>)}{!proposals.length&&<div className="empty">Your event proposals will appear here after submission.</div>}</div>
     </section>
