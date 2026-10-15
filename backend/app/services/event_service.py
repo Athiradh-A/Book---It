@@ -83,6 +83,18 @@ class EventService:
             event.current_approval_level = 3
             event.status = BookingStatus.PENDING_DIRECTOR_APPROVAL
         elif event.current_approval_level == 3:
+            active_hold = db.query(BookingHold).filter(
+                BookingHold.room_id == event.room_id, BookingHold.user_id == event.requested_by,
+                BookingHold.start_time == event.start_time, BookingHold.end_time == event.end_time,
+                BookingHold.status == "ACTIVE", BookingHold.expires_at > datetime.utcnow()
+            ).first()
+            if not active_hold:
+                req = AvailabilityRequest(date=event.date, start_time=event.start_time, end_time=event.end_time, required_capacity=event.expected_attendees or 1, required_equipment_ids=[])
+                conflict = AvailabilityService.check_room_availability(db, event.room_id, req)
+                if not conflict.is_available:
+                    db.rollback()
+                    raise HTTPException(409, f"The hall hold expired and the room is no longer available: {conflict.details or conflict.conflict_type}")
+                db.add(BookingHold(room_id=event.room_id, user_id=event.requested_by, date=event.date, start_time=event.start_time, end_time=event.end_time, expires_at=datetime.utcnow()+timedelta(hours=48), status="ACTIVE"))
             event.current_approval_level = 4
             event.status = BookingStatus.PENDING_EVENTS_APPROVAL
         elif event.current_approval_level == 4:
