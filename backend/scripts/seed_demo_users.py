@@ -14,7 +14,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "backend"))
 from app.db.session import SessionLocal
-from app.models.models import User, Role, UserRole
+from app.models.models import User, Role, UserRole, Faculty
 from app.core.security import get_password_hash
 
 if os.getenv("BOOKIT_SEED_DEMO_USERS") != "1":
@@ -54,6 +54,8 @@ try:
         link = db.query(UserRole).filter(UserRole.user_id == user.id, UserRole.role_id == roles[role_name].id).first()
         if not link:
             db.add(UserRole(user_id=user.id, role_id=roles[role_name].id))
+        if role_name == "FACULTY" and not db.query(Faculty).filter(Faculty.user_id == user.id).first():
+            db.add(Faculty(user_id=user.id, department="General"))
     db.commit()
     print("Demo accounts ready. Newly created users:", ", ".join(created) if created else "none (accounts/roles already existed)")
     print("Login username:", ", ".join(a[0] for a in ACCOUNTS))
