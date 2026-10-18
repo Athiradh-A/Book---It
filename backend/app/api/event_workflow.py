@@ -14,8 +14,20 @@ router = APIRouter(prefix="/events", tags=["Event workflow"])
 MAX_FILE_SIZE = 10 * 1024 * 1024
 ALLOWED_EXTENSIONS = {".pdf", ".doc", ".docx", ".png", ".jpg", ".jpeg", ".xlsx", ".pptx"}
 
+STAGE_ROLE = {1: "FACULTY", 2: "WELFARE", 3: "DIRECTOR", 4: "EVENTS"}
+
+
 def _can_view(event, user, roles):
-    return event.requested_by == user.id or bool(set(roles) & {"FACULTY", "WELFARE", "DIRECTOR", "EVENTS", "ADMIN"})
+    if event.requested_by == user.id or "ADMIN" in set(roles):
+        return True
+    status_value = event.status.value if hasattr(event.status, "value") else str(event.status)
+    current_role = {
+        "PENDING_FACULTY_APPROVAL": "FACULTY",
+        "PENDING_WELFARE_APPROVAL": "WELFARE",
+        "PENDING_DIRECTOR_APPROVAL": "DIRECTOR",
+        "PENDING_EVENTS_APPROVAL": "EVENTS",
+    }.get(status_value)
+    return current_role in set(roles)
 
 @router.get("/{event_id}/history")
 def event_history(event_id: int, db: Session = Depends(get_db), user=Depends(get_current_user), roles=Depends(get_current_user_roles)):
@@ -33,6 +45,7 @@ def event_history(event_id: int, db: Session = Depends(get_db), user=Depends(get
         "event_name": event.event_name,
         "status": event.status.value if hasattr(event.status, "value") else str(event.status),
         "current_approval_level": event.current_approval_level,
+        "room_id": event.room_id, "date": event.date, "start_time": event.start_time, "end_time": event.end_time, "expected_attendees": event.expected_attendees, "description": event.description, "event_category": event.event_category,
         "proposal_details": json.loads(detail.details_json) if detail else {},
         "approval_history": [{"id": x.id, "level": x.level, "approver_id": x.approver_id, "decision": x.decision, "comment": x.comment, "decided_at": x.decided_at} for x in steps],
         "meetings": [{"id": x.id, "approval_level": x.approval_level, "reason": x.reason, "preferred_at": x.preferred_at, "status": x.status, "resolution_note": x.resolution_note, "created_at": x.created_at, "resolved_at": x.resolved_at} for x in meetings],
@@ -44,7 +57,7 @@ async def upload_event_documents(event_id: int, files: list[UploadFile] = File(.
     event = db.query(EventRequest).filter(EventRequest.id == event_id).first()
     if not event:
         raise HTTPException(404, "Event request not found")
-    if not _can_view(event, user, roles) or (event.requested_by != user.id and "ADMIN" not in roles):
+    if event.requested_by != user.id and "ADMIN" not in roles:
         raise HTTPException(403, "Only the event requester or an administrator can upload documents")
     if not files or len(files) > 10:
         raise HTTPException(422, "Upload between 1 and 10 files")
@@ -93,16 +106,15 @@ def request_meeting(event_id: int, payload: dict, db: Session = Depends(get_db),
     db.commit(); db.refresh(meeting)
     return {"id": meeting.id, "status": meeting.status, "message": "Meeting request recorded"}
 
-@router.post("/{event_id}/meeting-requests/{meeting_id}/resolve", dependencies=[Depends(require_role(["FACULTY", "WELFARE", "DIRECTOR", "EVENTS", "ADMIN"]))])
+@router.post("/{event_id}/meeting-requests/{meeting_id}/resolve", dependencies=[Depends(require_role(["FACULTY", "WELFARE", "DIRECTOR", "EVENTS"]))])
 def resolve_meeting(event_id: int, meeting_id: int, payload: dict, db: Session = Depends(get_db), user=Depends(get_current_user), roles=Depends(get_current_user_roles)):
     event = db.query(EventRequest).filter(EventRequest.id == event_id).first()
     meeting = db.query(EventMeetingRequest).filter(EventMeetingRequest.id == meeting_id, EventMeetingRequest.event_request_id == event_id).with_for_update().first()
     if not event or not meeting:
         raise HTTPException(404, "Meeting request not found")
-    if "ADMIN" not in roles:
-        expected = {1: "FACULTY", 2: "WELFARE", 3: "DIRECTOR", 4: "EVENTS"}.get(meeting.approval_level)
-        if expected not in roles:
-            raise HTTPException(403, "Your role cannot resolve this meeting")
+    expected = STAGE_ROLE.get(meeting.approval_level)
+    if expected not in roles:
+        raise HTTPException(403, "Your assigned role cannot resolve this meeting stage")
     status_value = str(payload.get("status", "SCHEDULED")).upper()
     if status_value not in {"SCHEDULED", "RESOLVED", "DECLINED"}:
         raise HTTPException(422, "status must be SCHEDULED, RESOLVED, or DECLINED")

@@ -33,6 +33,7 @@ class HoldRequest(BaseModel):
     start_time: str
     end_time: str
     expected_attendees: int = 1
+    target_faculty_id: int
 
 class HoldResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -44,3 +45,4 @@ class ConfirmRequest(BaseModel):
     hold_id: int
     purpose: str
     expected_attendees: int
+    assigned_faculty_email: str

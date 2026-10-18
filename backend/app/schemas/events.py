@@ -40,7 +40,9 @@ class EventRequestOut(BaseModel):
 
 class ApprovalDecision(BaseModel):
     decision: str = Field(..., pattern="^(APPROVED|REJECTED|RETURNED|MEETING_REQUESTED)$")
-    comment: str = Field(..., min_length=1)
+    # Comments are optional for ordinary decisions. A reason is enforced by the
+    # service when an approver requests a meeting.
+    comment: str = ""
     preferred_meeting_at: Optional[datetime] = None
 
 class NotificationOut(BaseModel):

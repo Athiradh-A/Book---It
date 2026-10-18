@@ -1,0 +1,48 @@
+warning: in the working copy of 'backend/app/api/auth.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/app/api/bookings.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/app/api/deps.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/app/api/event_registration.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/app/api/event_workflow.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/app/api/events.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/app/models/models.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/app/schemas/bookings.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/app/services/event_service.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/package-lock.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/App.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/components/Shell.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/index.css', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/lib/api.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/pages/Approvals.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/pages/Dashboard.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/pages/EventRegistration.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/pages/EventRequest.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/pages/MyBookings.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/pages/SlotBooking.tsx', LF will be replaced by CRLF the next time Git touches it
+ backend/app/api/auth.py                      | 193 [32m+++++[m[31m--[m
+ backend/app/api/bookings.py                  | 181 [32m+++++[m[31m-[m
+ backend/app/api/deps.py                      |  65 [32m++[m[31m-[m
+ backend/app/api/event_registration.py        |  21 [32m+[m[31m-[m
+ backend/app/api/event_workflow.py            |  26 [32m+[m[31m-[m
+ backend/app/api/events.py                    |  24 [32m+[m[31m-[m
+ backend/app/api/room_inventory.py            | 211 [32m+++++[m[31m--[m
+ backend/app/api/timetable_dataset.py         | 750 [32m++++++++++++++++++++[m[31m-----[m
+ backend/app/models/models.py                 |   5 [32m+[m
+ backend/app/schemas/bookings.py              |   2 [32m+[m
+ backend/app/schemas/events.py                |   4 [32m+[m[31m-[m
+ backend/app/schemas/resources.py             |  63 [32m++[m[31m-[m
+ backend/app/services/availability_service.py | 352 [32m+++++++++[m[31m---[m
+ backend/app/services/event_service.py        |  76 [32m++[m[31m-[m
+ frontend/src/App.tsx                         |  20 [32m+[m[31m-[m
+ frontend/src/components/Shell.tsx            |  34 [32m+[m[31m-[m
+ frontend/src/index.css                       | 802 [32m++++++++++++++++++++++++++[m[31m-[m
+ frontend/src/lib/api.ts                      |  93 [32m+++[m[31m-[m
+ frontend/src/pages/Approvals.tsx             | 326 [32m++++++++++[m[31m-[m
+ frontend/src/pages/Dashboard.tsx             | 461 [32m++++++++++++++[m[31m-[m
+ frontend/src/pages/EventRegistration.tsx     | 422 [32m+++++++++++++[m[31m-[m
+ frontend/src/pages/EventRequest.tsx          |  14 [32m+[m[31m-[m
+ frontend/src/pages/Landing.tsx               |  41 [32m+[m[31m-[m
+ frontend/src/pages/Login.tsx                 | 145 [32m++++[m[31m-[m
+ frontend/src/pages/MyBookings.tsx            |   5 [32m+[m[31m-[m
+ frontend/src/pages/RoomSearch.tsx            |  65 [32m++[m[31m-[m
+ frontend/src/pages/SlotBooking.tsx           |  44 [32m+[m[31m-[m
+ 27 files changed, 3964 insertions(+), 481 deletions(-)
