@@ -12,6 +12,7 @@ import {
 import { Link } from "react-router-dom";
 
 export default function Landing() {
+  const isLoggedIn = !!localStorage.getItem("token");
   const campusRoomUrl =
     import.meta.env.VITE_CAMPUS_ROOM_URL || "http://localhost:3000";
   return (
@@ -23,9 +24,22 @@ export default function Landing() {
           <span>IT</span>
         </div>
         <div>
-          <Link to="/login" className="text-link">
-            Sign in
-          </Link>
+          {isLoggedIn ? (
+            <Link
+              to="/login"
+              className="text-link"
+              onClick={() => {
+                localStorage.removeItem("token");
+                localStorage.removeItem("refresh_token");
+              }}
+            >
+              Log out
+            </Link>
+          ) : (
+            <Link to="/login" className="text-link">
+              Sign in
+            </Link>
+          )}
           <Link to="/login?next=%2Frooms" className="pill">
             Find a space <ArrowUpRight size={16} />
           </Link>
@@ -83,14 +97,20 @@ export default function Landing() {
         </div>
       </section>
       <section className="categories" aria-label="Booking categories">
-        <Link to="/login?next=%2Frooms" className="category-card cobalt">
+        <Link
+          to={isLoggedIn ? "/rooms" : "/login?next=%2Frooms"}
+          className="category-card cobalt"
+        >
           <span>01</span>
           <Building2 />
           <h2>Classrooms</h2>
           <p>Timetable-aware booking with live holds.</p>
           <ArrowUpRight />
         </Link>
-        <Link to="/login?next=%2Fevents" className="category-card ink">
+        <Link
+          to={isLoggedIn ? "/events" : "/login?next=%2Fevents"}
+          className="category-card ink"
+        >
           <span>02</span>
           <CalendarDays />
           <h2>Halls & events</h2>
@@ -99,7 +119,11 @@ export default function Landing() {
         </Link>
 
         <Link
-          to="/login?next=%2Fevent-registration"
+          to={
+            isLoggedIn
+              ? "/event-registration"
+              : "/login?next=%2Fevent-registration"
+          }
           className="category-card ink"
         >
           <span>03</span>
@@ -108,7 +132,10 @@ export default function Landing() {
           <p>Role-aware event publishing and registration.</p>
           <ArrowUpRight />
         </Link>
-        <Link to="/login?next=%2Famenities" className="category-card coral">
+        <Link
+          to={isLoggedIn ? "/amenities" : "/login?next=%2Famenities"}
+          className="category-card coral"
+        >
           <span>04</span>
           <FlaskConical />
           <h2>Amenities</h2>

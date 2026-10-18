@@ -1,6 +1,6 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from app.api import auth, resources, bookings, events, analytics, allocation, buildings, amenities, event_registration
+from app.api import auth, resources, bookings, events, analytics, allocation, buildings, amenities, event_registration, event_workflow, timetable_dataset, room_inventory
 from app.core.websocket import manager
 from app.api.deps import get_current_user
 
@@ -23,6 +23,9 @@ app.include_router(allocation.router, prefix="/api")
 app.include_router(buildings.router, prefix="/api")
 app.include_router(amenities.router, prefix="/api")
 app.include_router(event_registration.router, prefix="/api")
+app.include_router(event_workflow.router, prefix="/api")
+app.include_router(timetable_dataset.router, prefix="/api")
+app.include_router(room_inventory.router, prefix="/api")
 
 @app.websocket("/ws/{user_id}")
 async def websocket_endpoint(websocket: WebSocket, user_id: int):

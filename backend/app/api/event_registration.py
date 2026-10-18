@@ -6,7 +6,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from app.api.deps import get_current_user, require_role
 from app.db.session import get_db
-from app.models.models import RegistrationEvent, EventTicketAllocation, Room
+from app.models.models import RegistrationEvent, EventTicketAllocation, Room, Role, UserRole
 from app.schemas.event_registration import RegistrationEventCreate, TicketHoldCreate, TicketConfirm
 
 router = APIRouter(prefix="/event-registration", tags=["Event registration"])
@@ -30,13 +30,17 @@ def serialize_event(db: Session, event: RegistrationEvent):
 
 @router.get("")
 def list_registration_events(db: Session = Depends(get_db), user=Depends(get_current_user)):
-    from app.models.models import Role, UserRole
     roles = {name for (name,) in db.query(Role.name).join(UserRole, UserRole.role_id == Role.id).filter(UserRole.user_id == user.id).all()}
     query = db.query(RegistrationEvent)
-    query = query.filter(RegistrationEvent.faculty_id == user.id) if "FACULTY" in roles else query.filter(RegistrationEvent.published.is_(True))
+    if "ADMIN" in roles:
+        query = query.filter(RegistrationEvent.published.is_(True))
+    elif "FACULTY" in roles or "WELFARE" in roles or "DIRECTOR" in roles or "EVENTS" in roles:
+        query = query.filter((RegistrationEvent.faculty_id == user.id) | (RegistrationEvent.published.is_(True)))
+    else:
+        query = query.filter(RegistrationEvent.published.is_(True))
     return [serialize_event(db, event) for event in query.order_by(RegistrationEvent.starts_at).all()]
 
-@router.post("", status_code=201, dependencies=[Depends(require_role(["FACULTY", "ADMIN"]))])
+@router.post("", status_code=201, dependencies=[Depends(require_role(["FACULTY", "WELFARE", "DIRECTOR", "EVENTS", "ADMIN"]))])
 def create_registration_event(payload: RegistrationEventCreate, db: Session = Depends(get_db), user=Depends(get_current_user)):
     if payload.registration_deadline and payload.registration_deadline > payload.starts_at:
         raise HTTPException(422, "Registration deadline must be before the event")
@@ -76,11 +80,14 @@ def confirm_ticket(event_id: int, payload: TicketConfirm, db: Session = Depends(
     ticket.status = "CONFIRMED"; ticket.expires_at = None; db.commit()
     return {"message": "Ticket confirmed"}
 
-@router.get("/{event_id}/applicants", dependencies=[Depends(require_role(["FACULTY", "ADMIN"]))])
+@router.get("/{event_id}/applicants", dependencies=[Depends(require_role(["FACULTY", "WELFARE", "DIRECTOR", "EVENTS", "ADMIN"]))])
 def event_applicants(event_id: int, db: Session = Depends(get_db), user=Depends(get_current_user)):
     event = db.query(RegistrationEvent).filter(RegistrationEvent.id == event_id).first()
-    if not event or event.faculty_id != user.id:
-        raise HTTPException(403, "Only the event owner can view applicants")
+    from app.api.deps import get_current_user_roles
+    roles = set(db.query(Role.name).join(UserRole, UserRole.role_id == Role.id).filter(UserRole.user_id == user.id).all()[i][0] for i in range(db.query(Role.name).join(UserRole, UserRole.role_id == user.id).count())) if False else set()
+    roles = {name for (name,) in db.query(Role.name).join(UserRole, UserRole.role_id == Role.id).filter(UserRole.user_id == user.id).all()}
+    if not event or (event.faculty_id != user.id and not (roles & {"EVENTS", "ADMIN"})):
+        raise HTTPException(403, "Only the event owner or Events Office can view applicants")
     now = datetime.utcnow()
     applicants = db.query(EventTicketAllocation).filter(EventTicketAllocation.event_id == event.id, or_(EventTicketAllocation.status == "CONFIRMED", EventTicketAllocation.expires_at > now)).order_by(EventTicketAllocation.created_at).all()
     return {"event": serialize_event(db, event), "applicants": applicants}

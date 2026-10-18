@@ -10,11 +10,24 @@ import MyBookings from './pages/MyBookings'
 import Shell from './components/Shell'
 import Approvals from './pages/Approvals'
 import EventRegistration from './pages/EventRegistration'
+import TimetableAdmin from './pages/TimetableAdmin'
+import { useEffect, useState } from 'react'
+import { api } from './lib/api'
 
-function Protected({ children }: { children: React.ReactNode }) {
+function Protected({ children, roles: allowed }: { children: React.ReactNode; roles?: string[] }) {
     const location = useLocation()
+    const [roles, setRoles] = useState<string[] | null>(null)
+    const token = localStorage.getItem('token')
+    useEffect(() => {
+        if (!token) { setRoles([]); return }
+        api.get('/auth/me').then(r => setRoles(r.data.roles || [])).catch(() => { localStorage.removeItem('token'); localStorage.removeItem('refresh_token'); setRoles([]) })
+    }, [token])
     const loginTarget = `/login?next=${encodeURIComponent(location.pathname + location.search)}`
-    return localStorage.getItem('token') ? children : <Navigate to={loginTarget} replace />
+    if (!token) return <Navigate to={loginTarget} replace />
+    if (roles === null) return <div className="page-loading">Loading your permissions…</div>
+    if (!roles.length) return <Navigate to={loginTarget} replace />
+    if (allowed && !allowed.some(role => roles.includes(role))) return <Navigate to="/dashboard" replace />
+    return children
 }
 
 function App() {
@@ -31,7 +44,8 @@ function App() {
                     <Route path='/event-registration' element={<EventRegistration />} />
                     <Route path='/amenities' element={<Amenities />} />
                     <Route path='/bookings' element={<MyBookings />} />
-                    <Route path='/approvals' element={<Approvals />} />
+                    <Route path='/approvals' element={<Protected roles={['FACULTY', 'WELFARE', 'DIRECTOR', 'EVENTS']}><Approvals /></Protected>} />
+                    <Route path='/admin/timetable' element={<Protected roles={['ADMIN']}><TimetableAdmin /></Protected>} />
                 </Route>
                 <Route path='*' element={<Navigate to='/' />} />
             </Routes>

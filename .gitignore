@@ -9,6 +9,7 @@ frontend/dist/
 frontend/.vite/
 backend/campusroom/node_modules/
 backend/campusroom/uploads/
+backend/uploads/
 backend/campusroom/.env
 
 # Python generated files and local environments

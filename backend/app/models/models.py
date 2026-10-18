@@ -10,6 +10,7 @@ class BookingStatus(enum.Enum):
     PENDING_FACULTY_APPROVAL = "PENDING_FACULTY_APPROVAL"
     PENDING_WELFARE_APPROVAL = "PENDING_WELFARE_APPROVAL"
     PENDING_DIRECTOR_APPROVAL = "PENDING_DIRECTOR_APPROVAL"
+    PENDING_EVENTS_APPROVAL = "PENDING_EVENTS_APPROVAL"
     CONFIRMED = "CONFIRMED"
     REJECTED = "REJECTED"
     RETURNED_FOR_CHANGES = "RETURNED_FOR_CHANGES"
@@ -96,12 +97,16 @@ class Booking(Base):
     id = Column(Integer, primary_key=True, index=True)
     room_id = Column(Integer, ForeignKey("rooms.id"))
     requester_id = Column(Integer, ForeignKey("users.id"))
+    assigned_faculty_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
+    event_request_id = Column(Integer, ForeignKey("event_requests.id"), nullable=True, index=True)
     booking_type = Column(String) # CLASSROOM, HALL
     date = Column(DateTime, nullable=False)
     start_time = Column(DateTime, nullable=False)
     end_time = Column(DateTime, nullable=False)
     status = Column(SQLEnum(BookingStatus), default=BookingStatus.CONFIRMED)
     purpose = Column(Text)
+    target_faculty_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
+    decision_comment = Column(Text, nullable=True)
     expected_attendees = Column(Integer)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     confirmed_at = Column(DateTime(timezone=True))
@@ -112,6 +117,7 @@ class BookingHold(Base):
     room_id = Column(Integer, ForeignKey("rooms.id"))
     user_id = Column(Integer, ForeignKey("users.id"))
     date = Column(DateTime, nullable=False)
+    target_faculty_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
     start_time = Column(DateTime, nullable=False)
     end_time = Column(DateTime, nullable=False)
     expires_at = Column(DateTime, nullable=False)
@@ -141,6 +147,37 @@ class ApprovalStep(Base):
     decision = Column(String) # APPROVED, REJECTED, RETURNED
     comment = Column(Text)
     decided_at = Column(DateTime(timezone=True), server_default=func.now())
+
+class EventProposalDetails(Base):
+    __tablename__ = "event_proposal_details"
+    id = Column(Integer, primary_key=True, index=True)
+    event_request_id = Column(Integer, ForeignKey("event_requests.id", ondelete="CASCADE"), nullable=False, unique=True, index=True)
+    details_json = Column(Text, nullable=False, default="{}")
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+class EventDocument(Base):
+    __tablename__ = "event_documents"
+    id = Column(Integer, primary_key=True, index=True)
+    event_request_id = Column(Integer, ForeignKey("event_requests.id", ondelete="CASCADE"), nullable=False, index=True)
+    uploaded_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+    original_name = Column(String, nullable=False)
+    stored_name = Column(String, nullable=False, unique=True)
+    mime_type = Column(String)
+    file_size = Column(Integer, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+class EventMeetingRequest(Base):
+    __tablename__ = "event_meeting_requests"
+    id = Column(Integer, primary_key=True, index=True)
+    event_request_id = Column(Integer, ForeignKey("event_requests.id", ondelete="CASCADE"), nullable=False, index=True)
+    requested_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+    approval_level = Column(Integer, nullable=False)
+    reason = Column(Text, nullable=False)
+    preferred_at = Column(DateTime(timezone=True))
+    status = Column(String, nullable=False, default="REQUESTED")
+    resolution_note = Column(Text)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    resolved_at = Column(DateTime(timezone=True))
 
 class Maintenance(Base):
     __tablename__ = "maintenance"
